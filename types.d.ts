@@ -70,7 +70,7 @@ interface UniversityInfo {
 			// male: number;
 			// female: number;
 		};
-		// yieldRate: number;
+		yieldRate: number;
 		applicants: {
 			total: number;
 			male: number;

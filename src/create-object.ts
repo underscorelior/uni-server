@@ -105,6 +105,7 @@ export function createObject(row): UniversityInfo {
 			acceptanceRate: {
 				overall: row['acceptance_rate'],
 			},
+			yieldRate: row['enrolled_total'] / row['admitted_total'],
 			applicants: {
 				total: row['applicants_total'],
 				male: row['applicants_male'],
