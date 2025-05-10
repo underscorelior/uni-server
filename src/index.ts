@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import sqlite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
 import { createObject } from './create-object';
+import { shorthands } from './data';
 
 const app = express();
 
@@ -14,12 +15,11 @@ const initDb = async (): Promise<Database> => {
 
 // @ts-ignore
 app.get('/api/search', async (req: Request, res: Response) => {
-	const search = req.query.search as string;
+	const search = (req.query.search as string).toLowerCase();
 	if (!search) {
 		return res.status(400).json({ message: "Missing 'search' parameter" });
 	}
-	const words = search
-		.toLowerCase()
+	let words = search
 		.replace(/[^0-9a-z]/gi, ' ')
 		.split(' ')
 		.filter(Boolean);
@@ -28,19 +28,38 @@ app.get('/api/search', async (req: Request, res: Response) => {
 		return res.status(400).json({ message: 'Invalid search parameter' });
 	}
 
-	if (search.toLowerCase() == 'mit') {
-		words.push('massachusetts', 'institute', 'technology');
+	if (Object.keys(shorthands).includes(search)) {
+		words = shorthands[search];
 	}
 
+	console.log(words);
 	const clauses = words
 		.map(() => `(inst_name LIKE ? OR short LIKE ? )`)
 		.join(' AND ');
-	const query = `SELECT DISTINCT id, inst_name, state, city FROM college_view WHERE ${clauses} LIMIT 50`;
+	const query = `SELECT DISTINCT id, inst_name, state, city FROM college_view WHERE ${clauses} ORDER BY total_students DESC LIMIT 50`;
 
 	try {
 		const db = await initDb();
 		const params = words.flatMap((w) => [`%${w}%`, `%${w}%`]);
 		const rows = await db.all(query, params);
+		if (search == 'mit') {
+			rows.push(
+				[
+					...(await db.all(
+						`SELECT DISTINCT id, inst_name, state, city FROM college_view WHERE inst_name IS 'The University of Texas at Dallas' LIMIT 1`
+					)),
+				][0]
+			);
+		}
+		if (search == 'utd' || search == 'utdallas' || search == 'ut dallas') {
+			rows.push(
+				[
+					...(await db.all(
+						`SELECT DISTINCT id, inst_name, state, city FROM college_view WHERE inst_name IS 'Massachusetts Institute of Technology' LIMIT 1`
+					)),
+				][0]
+			);
+		}
 		res.json(rows);
 	} catch (error) {
 		console.error(error);
