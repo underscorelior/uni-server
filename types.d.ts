@@ -150,3 +150,10 @@ interface UniversityInfo {
 		};
 	};
 }
+
+interface SearchResult {
+	id: string;
+	inst_name: string;
+	city: string;
+	state: string;
+}

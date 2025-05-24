@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import sqlite3 from 'sqlite3';
 import { open, Database } from 'sqlite';
 import { createObject } from './create-object';
-import { shorthands } from './data';
+import { getIDs, shorthands } from './utils';
 
 const app = express();
 
@@ -28,34 +28,33 @@ app.get('/api/search', async (req: Request, res: Response) => {
 		return res.status(400).json({ message: 'Invalid search parameter' });
 	}
 
-	if (Object.keys(shorthands).includes(search)) {
-		words = shorthands[search];
-	}
-
-	console.log(words);
 	const clauses = words
 		.map(() => `(inst_name LIKE ? OR short LIKE ? )`)
 		.join(' AND ');
-	const query = `SELECT DISTINCT id, inst_name, state, city FROM college_view WHERE ${clauses} ORDER BY total_students DESC LIMIT 50`;
+	const query = `SELECT DISTINCT id, inst_name, state, city FROM college_view WHERE ${clauses} ORDER BY total_students + 0 DESC LIMIT 50`;
+	// order by population, if only online offered it goes below
 
 	try {
 		const db = await initDb();
 		const params = words.flatMap((w) => [`%${w}%`, `%${w}%`]);
 		const rows = await db.all(query, params);
+
+		if (Object.keys(shorthands).includes(search)) {
+			if (getIDs(rows).includes(shorthands[search])) {
+				rows.splice(getIDs(rows).indexOf(shorthands[search]), 1);
+			}
+			const sh = await db.all(
+				`SELECT DISTINCT id, inst_name, state, city FROM college_view WHERE id IS ${shorthands[search]} LIMIT 1`
+			);
+			rows.unshift(sh[0]);
+		}
+
 		if (search == 'mit') {
+			// make it such that if MIT is in the results, append
 			rows.push(
 				[
 					...(await db.all(
 						`SELECT DISTINCT id, inst_name, state, city FROM college_view WHERE inst_name IS 'The University of Texas at Dallas' LIMIT 1`
-					)),
-				][0]
-			);
-		}
-		if (search == 'utd' || search == 'utdallas' || search == 'ut dallas') {
-			rows.push(
-				[
-					...(await db.all(
-						`SELECT DISTINCT id, inst_name, state, city FROM college_view WHERE inst_name IS 'Massachusetts Institute of Technology' LIMIT 1`
 					)),
 				][0]
 			);
