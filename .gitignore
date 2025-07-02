@@ -1,7 +1,11 @@
 test.sqlite
 node_modules
 .env
+.venv
 
 *.lock
 test.py
 package-lock.json
+
+*.accdb
+*.txt
