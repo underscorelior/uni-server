@@ -179,12 +179,12 @@ def main():
         print(f"Error: Access database not found at '{ACCESS_DB_PATH}'")
         return
 
-    descriptions_df = get_access_table_data(
-        ACCESS_DB_PATH, "DESCRIPTIONS", ["UNITID", "DESCRIPTION"]
-    )
-    if descriptions_df is not None:
-        descriptions_df.to_csv(DESCRIPTIONS_CSV_PATH, index=False)
-        print(f"Exported DESCRIPTIONS table to '{DESCRIPTIONS_CSV_PATH}'")
+    if os.path.exists(SQL_OUTPUT_PATH):
+        conn = sqlite3.connect(SQL_OUTPUT_PATH)
+        df = pd.read_sql("SELECT * FROM descriptions", conn)
+        conn.close()
+        df.to_csv(DESCRIPTIONS_CSV_PATH, index=False)
+        print(f"Saved existing descriptions to '{DESCRIPTIONS_CSV_PATH}'")
 
     os.makedirs(os.path.dirname(SQL_OUTPUT_PATH), exist_ok=True)
     if os.path.exists(SQL_OUTPUT_PATH):
