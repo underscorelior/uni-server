@@ -137,7 +137,8 @@ def create_search_view(SQLITE_PATH):
             core.ALIAS,
             core.CITY,
             core.STATE,
-            enrollment.TOTAL_POP AS POPULATION,
+            enrollment.FT_POP AS FULL_TIME,
+            enrollment.PT_POP AS PART_TIME,
             enrollment.ONLINE
         FROM
             core, enrollment

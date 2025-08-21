@@ -1,159 +1,236 @@
 interface UniversityInfo {
 	id: number;
-	general: {
-		name: string;
-		location: {
-			city: string;
-			state: string;
-			// coords: { longitude: number; latitude: number };
-			campusLocale: number;
-		};
-		// description?: string; // TODO: CANNOT BE FOUND IN IPEDS
-		// foundedYear?: number; // TODO: cannot be found in IPEDS
-		// imageUrl?: string; // TODO: Not found in IPEDS
-		controlOfInst: number;
-		URLs: {
-			general: string;
-			admissions: string;
-			financialAid: string;
-			application: string;
-			netPriceCalc: string;
-		};
-		// missionStatement: string; // TODO: Needed??
+	core: CoreInfo;
+	description?: string;
+	admissions: Admissions;
+	enrollment: EnrollmentInfo;
+	costs: Costs;
+	outcomes: Outcomes;
+	services: Services;
+	// sports: Sports;
+}
+
+type CoreInfo = {
+	name: string;
+	alias: string; // TODO: Find a way to properly parse aliases
+	address: string;
+	city: string;
+	state: string;
+	longitude: number;
+	latitude: number;
+	phone?: number;
+	url: string;
+	hgh_deg: string | boolean | null;
+	hospital: boolean | null;
+	med_deg: boolean | null;
+	crn_basic: string;
+	crn_ugrd: string;
+	crn_enrl: string;
+	crn_size: string;
+	urban: string | null;
+	mc_sys: boolean | null;
+	mc_sys_nm?: string;
+	mc_sys_id?: number;
+	inst_control: string | null;
+	relig_control: string | null;
+	cal_sys: string | null;
+	ncaa_affl: boolean | null;
+	ncaa_div: number | null;
+};
+
+type Admissions = {
+	considerations: {
+		con_hs_gpa: { name: string | null; value: string | null };
+		con_class_rank: { name: string | null; value: string | null };
+		con_hs_record: { name: string | null; value: string | null };
+		con_prep_program: { name: string | null; value: string | null };
+		con_recommendations: { name: string | null; value: string | null };
+		con_competencies: { name: string | null; value: string | null };
+		con_test_scores: { name: string | null; value: string | null };
+		con_english_test: { name: string | null; value: string | null };
+		con_other_tests: { name: string | null; value: string | null };
+		con_work_experience: { name: string | null; value: string | null };
+		con_essay: { name: string | null; value: string | null };
+		con_legacy: { name: string | null; value: string | null };
 	};
-	academics: {
-		highestDegreeOffered: number;
-		// calendarSystem: string[]; // TODO: Needed?
-		studentFacultyRatio: string;
-		graduationRate: {
-			'4yr': number;
-			'5yr': number;
-			'6yr': number;
-		};
-		retentionRate: number;
+	appl: {
+		men: number | null;
+		women: number | null;
+		other: number | null;
+		unknown: number | null;
+		total: number | null;
 	};
-	enrollment: {
-		total: number;
-		graduate: number;
-		undergraduate: number;
-		demographics: {
-			gender: { [key: string]: { percent: number; total: number } };
-			race: { [key: string]: { percent: number } };
-		};
+	adm: {
+		men: number | null;
+		women: number | null;
+		other: number | null;
+		unknown: number | null;
+		total: number | null;
 	};
-	admissions: {
-		applicationFee: number;
-		// averageGPA?: number; // TODO: NOT INCLUDED IN IPEDS
-		testScores: {
-			sat: {
-				pctSubmit: number;
-				math: {
-					'25th': number;
-					'50th': number;
-					'75th': number;
-				};
-				reading: {
-					'25th': number;
-					'50th': number;
-					'75th': number;
-				};
-			};
-			act: {
-				pctSubmit: number;
-				'25th': number;
-				'50th': number;
-				'75th': number;
-			};
-		};
-		acceptanceRate: {
-			overall: number;
-			// male: number;
-			// female: number;
-		};
-		yieldRate: number;
-		applicants: {
-			total: number;
-			male: number;
-			female: number;
-			other: number;
-		};
-		admitted: {
-			total: number;
-			// male: number;
-			// female: number;
-			// other: number;
-		};
-		enrolled: {
-			total: number;
-			// male: number;
-			// female: number;
-			// other: number;
-		};
-		// considerations: {
-		// 	gpa: number;
-		// 	rank: number;
-		// 	record: number;
-		// 	collegePrep: number;
-		// 	recommendations: number;
-		// 	demonstration: number;
-		// 	tests: number;
-		// 	workExp: number;
-		// 	essay: number;
-		// 	legacy: number;
-		// };
+	enrl: {
+		men: number | null;
+		women: number | null;
+		other: number | null;
+		unknown: number | null;
+		total: number | null;
 	};
-	financial: {
-		tuitionvaries: boolean;
-		costs: {
-			inState: {
-				tuition: number;
-				fees: number;
-				percentage: number;
-				totalcost: number;
-				net: number;
-			};
-			outOfState: {
-				tuition: number;
-				fees: number;
-				percentage: number;
-				totalcost: number;
-				net: number;
-			};
-			// room: {
-			// 	offered: boolean;
-			// 	capacity: number;
-			// 	cost: number;
-			// };
-			// board: {
-			// 	offered: boolean;
-			// 	mealsWk: number;
-			// 	cost: number;
-			// };
-		};
-		aid: {
-			general: {
-				percentage: number;
-				average: number;
-			};
-			// federal: {
-			// 	percentage: number;
-			// 	average: number;
-			// };
-			// state: {
-			// 	percentage: number;
-			// 	average: number;
-			// };
-			// institutional: {
-			// 	percentage: number;
-			// 	average: number;
-			// };
-		};
+	acc_rate: number | null;
+	acc_rate_men: number | null;
+	acc_rate_women: number | null;
+	yield_rate: number | null;
+	yield_rate_men: number | null;
+	yield_rate_women: number | null;
+	sat: {
+		pct: number | null;
+		rw_25: number | null;
+		rw_50: number | null;
+		rw_75: number | null;
+		math_25: number | null;
+		math_50: number | null;
+		math_75: number | null;
 	};
+	act: {
+		pct: number | null;
+		comp_25: number | null;
+		comp_50: number | null;
+		comp_75: number | null;
+		eng_25: number | null;
+		eng_50: number | null;
+		eng_75: number | null;
+		math_25: number | null;
+		math_50: number | null;
+		math_75: number | null;
+	};
+	ap_credit: boolean | null;
+};
+
+type EnrollmentInfo = {
+	offers_ugrd: boolean | null;
+	offers_grad: boolean | null;
+	instsize: string;
+	total_pop: number;
+	ugrd_pop: number;
+	grad_pop: number;
+	ft_pop: number;
+	pt_pop: number;
+	pct: {
+		native: number;
+		asian: number;
+		black: number;
+		hispanic: number;
+		pacific: number;
+		white: number;
+		two: number;
+		unknown: number;
+		nonresident: number;
+		women: number;
+		online_only: number;
+		some_online: number;
+		no_online: number;
+	};
+	frsh_camp_req: boolean | null;
+	online: boolean | null;
+};
+
+type Costs = {
+	ug_app_fee: number;
+	gr_app_fee: number;
+	net_calc_url: string;
+	tuit_vary: boolean | null;
+	offers_housing: boolean | null;
+	housing_capacity: number | null;
+	offers_meal_plan: boolean | string | null;
+	meals_wk: number | null;
+	dorm_cost: number | null;
+	meal_cost: number | null;
+	rm_mls_cost: number | null;
+	supp_cost: number | null;
+	in: {
+		tuition: number;
+		fees: number;
+		pct: number;
+		total_cost: number;
+		net_cost: number;
+	};
+	out: {
+		tuition: number;
+		fees: number;
+		pct: number;
+		total_cost: number;
+		net_cost: number;
+	};
+	on_dorm_mls_cost: number | null;
+	on_other_cost: number | null;
+	off_dorm_mls_cost: number | null;
+	off_other_cost: number | null;
+	off_family_other_cost: number | null;
+	pct_unkwn_tuit: number | null;
+	pct_grant_aid: number | null;
+	avg_grant_aid_amt: number | null;
+};
+
+type Outcomes = {
+	grad_rate_4_yr: number;
+	grad_rate_5_yr: number;
+	grad_rate_6_yr: number;
+	ret_rate_ft: number;
+	ret_rate_pt: number;
+	stu_fac: number;
+	transfer_out_rate: number;
+};
+
+type Services = {
+	adm_url: string | null;
+	faid_url: string | null;
+	appl_url: string | null;
+	rotc: boolean | null;
+	study_abroad: boolean | null;
+	teacher_cert: boolean | null;
+	ug_research: boolean | null;
+	no_special_learning: boolean | null;
+	career_counseling: boolean | null;
+	employment_services: boolean | null;
+	placement_services: boolean | null;
+	no_student_services: boolean | null;
+};
+
+// type Sports = {
+// 	// ncaa_affl: boolean | null;
+// 	// ncaa_div: number | null;
+// 	football: boolean | null;
+// 	football_conf: string | null;
+// 	football_conf_id: number | null;
+// 	basketball: boolean | null;
+// 	basketball_conf: string | null;
+// 	basketball_conf_id: number | null;
+// 	baseball: boolean | null;
+// 	baseball_conf: string | null;
+// 	baseball_conf_id: number | null;
+// 	track: boolean | null;
+// 	track_conf: string | null;
+// 	track_conf_id: number | null;
+// };
+
+type DBError = {
+	message: string;
+	status: number;
+};
+
+interface Search {
+	id: number;
+	name: string;
+	alias: string;
+	full_time: number;
+	part_time: number;
+	city: string;
+	state: string;
+	online: boolean | null;
 }
 
 interface SearchResult {
-	id: string;
-	inst_name: string;
+	id: number;
+	name: string;
 	city: string;
 	state: string;
+	online: boolean | null;
 }
