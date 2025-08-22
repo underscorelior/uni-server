@@ -247,6 +247,7 @@ schema = {
         "UNITID": "ID",
         "INSTNM": "NAME",
         "IALIAS": "ALIAS",
+        "GALIAS": "GEN_ALIAS",
         "ADDR": "ADDRESS",
         "CITY": "CITY",
         "STABBR": "STATE",
@@ -429,3 +430,4 @@ schema = {
     #     "CONFNO4": "TRACK_CONF_ID",
     # },
 }
+# TODO: GET EARNINGS DATA FROM SCORECARD OR SOMETHING SIMILAR

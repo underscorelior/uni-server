@@ -220,6 +220,7 @@ interface Search {
 	id: number;
 	name: string;
 	alias: string;
+	gen_alias: string;
 	full_time: number;
 	part_time: number;
 	city: string;
@@ -232,5 +233,5 @@ interface SearchResult {
 	name: string;
 	city: string;
 	state: string;
-	online: boolean | null;
+	online: boolean | null; // TODO: Add 'online' badge if its an online college to differentiate
 }

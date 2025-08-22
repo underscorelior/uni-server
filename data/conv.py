@@ -7,6 +7,7 @@ from data import schema, data
 import platform
 import pyodbc
 import sqlite3
+from gen_aliases import aliases
 
 
 def get_access_table_data(access_db_path, table_name, columns):
@@ -64,6 +65,14 @@ def apply_special_cases(df, column_rename_map):
             df.rename(columns={"div": "DIV_DIV"}, inplace=True)
         else:
             print(f"Warning: Division CSV '{DIVISION_CSV}' not found.")
+
+    if "GALIAS" in column_rename_map:
+        df["GALIAS"] = df.apply(
+            lambda row: ", ".join(
+                aliases(row["INSTNM"], row.get("F1SYSNAM", ""), row.get("WEBADDR", ""))
+            ),
+            axis=1,
+        )
 
     for col in list(column_rename_map.keys()):
         if col.endswith("_DUP"):
@@ -123,6 +132,7 @@ def apply_special_cases(df, column_rename_map):
             lambda x: 1 if pd.notnull(x) and x > 0.5 else (2 if pd.notnull(x) else -1)
         )
         print("Created 'ONLINE' column based on '{}'.".format(pct_online_col))
+
     return df
 
 
@@ -135,6 +145,7 @@ def create_search_view(SQLITE_PATH):
             core.ID,
             core.NAME,
             core.ALIAS,
+            core.GEN_ALIAS,
             core.CITY,
             core.STATE,
             enrollment.FT_POP AS FULL_TIME,
