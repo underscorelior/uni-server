@@ -150,14 +150,14 @@ type Costs = {
 		fees: number;
 		pct: number;
 		total_cost: number;
-		net_cost: number;
+		// net_cost: number;
 	};
 	out: {
 		tuition: number;
 		fees: number;
 		pct: number;
 		total_cost: number;
-		net_cost: number;
+		// net_cost: number;
 	};
 	on_dorm_mls_cost: number | null;
 	on_other_cost: number | null;

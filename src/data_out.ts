@@ -142,10 +142,10 @@ export async function enrollment(
 			? (val as string).trim()
 			: val;
 		if (key.startsWith('pct_')) {
-			if (!(output as any)[key.slice(0, 3)]) {
-				(output as any)[key.slice(0, 3)] = {} as EnrollmentInfo['pct'];
+			if (!(output as any)['pct']) {
+				(output as any)['pct'] = {} as EnrollmentInfo['pct'];
 			}
-			(output as any)[key.slice(0, 3)][key.slice(4)] = value;
+			(output as any)['pct'][key.slice(4)] = value;
 		} else {
 			(output as any)[key] = value;
 		}
@@ -160,20 +160,32 @@ export async function costs(id: number): Promise<Costs | DBError> {
 		return result;
 	}
 
-	const output = Object.fromEntries(
-		Object.entries(result).map(([col, val]) => {
-			const key = col.toLowerCase();
-			const conv = COSTS_CONV[key as keyof typeof COSTS_CONV];
+	const output = {} as Costs;
 
-			const value = conv
-				? (conv as any)[String(val)]
-				: typeof val === 'string'
-				? val.trim()
-				: val;
+	Object.entries(result).forEach(([col, val]) => {
+		const key = col.toLowerCase();
+		const conv = COSTS_CONV[key as keyof typeof COSTS_CONV];
 
-			return [key, value];
-		})
-	);
+		const value = conv
+			? (conv as any)[String(val)]
+			: typeof val === 'string'
+			? (val as string).trim()
+			: val;
+
+		if (key.startsWith('out_')) {
+			if (!(output as any)['out']) {
+				(output as any)['out'] = {} as Costs['out'];
+			}
+			(output as any)['out'][key.slice(4)] = value;
+		} else if (key.startsWith('in_')) {
+			if (!(output as any)['in']) {
+				(output as any)['in'] = {} as Costs['in'];
+			}
+			(output as any)['in'][key.slice(3)] = value;
+		} else {
+			(output as any)[key] = value;
+		}
+	});
 
 	return output as Costs;
 }
@@ -386,22 +398,34 @@ export async function saveDescription(
 	}
 }
 
-function deleteDescription(id: number): Promise<void | DBError> {
-	return new Promise(async (resolve, reject) => {
-		try {
-			const db = await open({
-				filename: 'data/universities.sqlite',
-				driver: sqlite3.Database,
-			});
+export async function deleteDescription(id: number): Promise<void | DBError> {
+	try {
+		const db = await open({
+			filename: 'data/universities.sqlite',
+			driver: sqlite3.Database,
+		});
 
-			await db.run(`DELETE FROM descriptions WHERE id = ?`, id);
-			await db.close();
-			resolve();
-		} catch (error) {
-			console.error(error);
-			reject({ status: 500, message: 'Database query error' } as DBError);
-		}
-	});
+		await db.run(`DELETE FROM descriptions WHERE id = ?`, id);
+		await db.close();
+	} catch (error) {
+		console.error(error);
+		return { status: 500, message: 'Database query error' } as DBError;
+	}
+}
+
+export async function deleteAllDescriptions(): Promise<void | DBError> {
+	try {
+		const db = await open({
+			filename: 'data/universities.sqlite',
+			driver: sqlite3.Database,
+		});
+
+		await db.run(`DELETE FROM descriptions`);
+		await db.close();
+	} catch (error) {
+		console.error(error);
+		return { status: 500, message: 'Database query error' } as DBError;
+	}
 }
 
 export async function description(id: number): Promise<string | DBError> {
@@ -412,7 +436,7 @@ export async function description(id: number): Promise<string | DBError> {
 		});
 
 		const result = await db.get<{ description: string }>(
-			`SELECT description FROM descriptions WHERE id = ?`,
+			`SELECT description FROM descriptions WHERE id = ? LIMIT 1`,
 			id
 		);
 
@@ -421,26 +445,19 @@ export async function description(id: number): Promise<string | DBError> {
 		await db.close();
 		if (!result) {
 			try {
-				const info = await getData(
-					id,
-					'core,admissions,enrollment,costs,outcomes,services'
-				);
-				if ('status' in info) {
-					return info as DBError;
-				}
-				console.log(`Generating description for ${info.core.name}...`);
+				const desc = await generateDescription(id);
 
-				const desc = await generateDescription(info);
 				if (typeof desc !== 'string') {
 					return desc as DBError;
 				}
+
 				await saveDescription(id, desc);
 				return desc;
-			} catch (error) {
+			} catch (error: any) {
 				console.error('Error generating description:', error);
 				return {
 					status: 500,
-					message: 'Error generating description',
+					message: 'Error generating description: ' + error.message,
 				} as DBError;
 			}
 		}
