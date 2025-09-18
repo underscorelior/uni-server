@@ -11,22 +11,19 @@ import tempfile
 def normalize_name(name: str) -> str:
     if not isinstance(name, str):
         return ""
-    name = re.sub(r"\[.*?\]|\(.*?\)", "", name).lower().strip()
-    return re.sub(r"[^a-z0-9]", "", name)
+    return re.sub(
+        r"[^a-z0-9]",
+        "",
+        re.sub(r"\[.*?\]|\(.*?\)", "", name).lower(),
+    )
 
 
 def normalize_url(url: str) -> str:
     if not isinstance(url, str):
         return ""
-    url = url.lower().strip()
-    url = re.sub(r"https?://", "", url)
-    url = re.sub(r"^www\.", "", url)
-    domain = url.split("/")[0]
-
-    parts = domain.split(".")
-    if len(parts) > 2:
-        domain = ".".join(parts[-2:])
-    return domain
+    url = re.sub(r"https?://|^www\\.", "", url.lower().strip()).split("/")[0]
+    parts = url.split(".")
+    return ".".join(parts[-2:]) if len(parts) > 2 else url
 
 
 def fetch_ncaa_division(division: int):
@@ -42,171 +39,131 @@ def fetch_ncaa_division(division: int):
                 "div": division,
                 "school_url": normalize_url(school_url),
                 "match_method": "Name",
+                "lookup": normalize_name(entry["nameOfficial"]),
             }
         )
     return pd.DataFrame(schools)
 
 
 def get_ncaa_data():
-    df = pd.concat([fetch_ncaa_division(d) for d in range(1, 4)], ignore_index=True)
-    df["lookup"] = df["school"].apply(normalize_name)
-    return df
+    return pd.concat([fetch_ncaa_division(d) for d in range(1, 4)], ignore_index=True)
 
 
-def load_ipeds_windows(accdb_path, hd, ic):
-    try:
-        import pyodbc
-
-        conn_str = (
-            f"DRIVER={{Microsoft Access Driver (*.mdb, *.accdb)}};DBQ={accdb_path};"
-        )
-        conn = pyodbc.connect(conn_str)
-
-        query_ic = f"SELECT UNITID, ASSOC1 FROM {ic.replace('.csv', '')}"
-        query_hd = f"SELECT UNITID, INSTNM, WEBADDR FROM {hd.replace('.csv', '')}"
-
-        df_ic = pd.read_sql(query_ic, conn, dtype={"UNITID": str})
-        df_hd = pd.read_sql(query_hd, conn, dtype={"UNITID": str})
-
-        conn.close()
-
-        df = df_ic.merge(df_hd, on="UNITID", how="left")
-        df["lookup"] = df["INSTNM"].apply(normalize_name)
-        df["url_lookup"] = df["WEBADDR"].apply(normalize_url)
-
-        return df[["UNITID", "INSTNM", "lookup", "url_lookup", "ASSOC1"]]
-
-    except (ImportError, Exception) as e:
-        print(f"Windows ACCDB connection failed: {e}")
-        return None
+def _finalize(df_ic: pd.DataFrame, df_hd: pd.DataFrame) -> pd.DataFrame:
+    df = df_ic.merge(df_hd[["UNITID", "INSTNM", "WEBADDR"]], on="UNITID", how="left")
+    df["lookup"] = df["INSTNM"].apply(normalize_name)
+    df["url_lookup"] = df["WEBADDR"].apply(normalize_url)
+    return df[["UNITID", "INSTNM", "lookup", "url_lookup", "ASSOC1"]]
 
 
-def load_ipeds_mac(accdb_path, hd, ic):
-    try:
-        subprocess.run(["which", "mdb-export"], check=True, capture_output=True)
+def _load_windows(accdb_path, ic, hd):
+    import pyodbc
 
-        with tempfile.TemporaryDirectory() as temp_dir:
-            ic_csv = os.path.join(temp_dir, ic)
-            hd_csv = os.path.join(temp_dir, hd)
+    table_ic = ic.replace(".csv", "").split("/")[-1]
+    table_hd = hd.replace(".csv", "").split("/")[-1]
 
-            with open(ic_csv, "w") as f:
+    conn = pyodbc.connect(
+        f"DRIVER={{Microsoft Access Driver (*.mdb, *.accdb)}};DBQ={os.getcwd()}/{accdb_path};"
+    )
+    df_ic = pd.read_sql(
+        f"SELECT UNITID, ASSOC1 FROM {table_ic}", conn, dtype={"UNITID": str}
+    )
+    df_hd = pd.read_sql(
+        f"SELECT UNITID, INSTNM, WEBADDR FROM {table_hd}", conn, dtype={"UNITID": str}
+    )
+    conn.close()
+    return _finalize(df_ic, df_hd)
+
+
+def _load_mac(accdb_path, ic, hd):
+    subprocess.run(["which", "mdb-export"], check=True, capture_output=True)
+    with tempfile.TemporaryDirectory() as tmp:
+        ic_csv = os.path.join(tmp, ic)
+        hd_csv = os.path.join(tmp, hd)
+        for tbl, out in [(ic, ic_csv), (hd, hd_csv)]:
+            with open(out, "w") as f:
                 subprocess.run(
-                    ["mdb-export", accdb_path, ic.replace("csv", "")],
+                    ["mdb-export", accdb_path, tbl.replace("csv", "")],
                     stdout=f,
                     check=True,
                 )
 
-            with open(hd_csv, "w") as f:
-                subprocess.run(
-                    ["mdb-export", accdb_path, hd.replace("csv", "")],
-                    stdout=f,
-                    check=True,
-                )
-
-            df_ic = pd.read_csv(ic_csv, dtype={"UNITID": str})
-            df_hd = pd.read_csv(hd_csv, dtype={"UNITID": str})
-
-            df = df_ic.merge(
-                df_hd[["UNITID", "INSTNM", "WEBADDR"]], on="UNITID", how="left"
-            )
-            df["lookup"] = df["INSTNM"].apply(normalize_name)
-            df["url_lookup"] = df["WEBADDR"].apply(normalize_url)
-
-            return df[["UNITID", "INSTNM", "lookup", "url_lookup", "ASSOC1"]]
-
-    except (subprocess.CalledProcessError, FileNotFoundError) as e:
-        print(f"Mac mdb-tools failed: {e}")
-        return None
+        df_ic = pd.read_csv(ic_csv, dtype={"UNITID": str})
+        df_hd = pd.read_csv(hd_csv, dtype={"UNITID": str})
+    return _finalize(df_ic, df_hd)
 
 
-def load_ipeds_csv(ic, hd):
-    try:
-        df_ic = pd.read_csv(ic, encoding="latin1", dtype={"UNITID": str}).rename(
-            columns={"UNITID": "UNITID"}
-        )
-        df_hd = pd.read_csv(hd, encoding="latin1", dtype={"UNITID": str}).rename(
-            columns={"UNITID": "UNITID", "INSTNM": "INSTNM"}
-        )
-        df = df_ic.merge(
-            df_hd[["UNITID", "INSTNM", "WEBADDR"]], on="UNITID", how="left"
-        )
-        df["lookup"] = df["INSTNM"].apply(normalize_name)
-        df["url_lookup"] = df["WEBADDR"].apply(normalize_url)
-        return df[["UNITID", "INSTNM", "lookup", "url_lookup", "ASSOC1"]]
-    except Exception as e:
-        print(f"CSV loading failed: {e}")
-        raise
+def _load_csv(ic, hd):
+    df_ic = pd.read_csv(ic, encoding="latin1", dtype={"UNITID": str})
+    df_hd = pd.read_csv(hd, encoding="latin1", dtype={"UNITID": str})
+    return _finalize(df_ic, df_hd)
 
 
 def load_ipeds(accdb_path, ic, hd):
     if os.path.exists(accdb_path):
-        print(f"Found ACCDB file: {accdb_path}")
-
-        if platform.system() == "Windows":
-            print("Using Windows pyodbc method...")
-            df = load_ipeds_windows(accdb_path, ic, hd)
-            if df is not None:
-                print("Successfully loaded from ACCDB on Windows")
-                return df
-
-        else:
-            print("Using non-windows mdb-tools method...")
-            df = load_ipeds_mac(accdb_path, ic, hd)
-            if df is not None:
-                print("Successfully loaded from ACCDB on non-Windows")
-                return df
-
-    print("Falling back to CSV files...")
+        try:
+            if platform.system() == "Windows":
+                return _load_windows(accdb_path, ic, hd)
+            else:
+                return _load_mac(accdb_path, ic, hd)
+        except Exception:
+            pass
     if os.path.exists(ic) and os.path.exists(hd):
-        print(f"Loading from CSV files: {ic}, {hd}")
-        return load_ipeds_csv(ic, hd)
-    else:
-        print(f"CSV files not found: {ic}, {hd}")
-        raise FileNotFoundError("Neither ACCDB nor CSV files found")
+        return _load_csv(ic, hd)
+    raise FileNotFoundError("Neither ACCDB nor CSV files found")
 
 
 def merge_ncaa_ipeds(df_ncaa, df_ipeds):
     merged = df_ncaa.merge(df_ipeds, on="lookup", how="left", suffixes=("", "_ipeds"))
+
     initial_name_matches = merged["UNITID"].notna().sum()
     print(f"Name matches: {initial_name_matches}")
 
-    missing_url = merged[merged["UNITID"].isna()]
-    url_matches = 0
-    if not missing_url.empty:
-        print(f"Trying URL matching for {len(missing_url)} schools...")
-        for idx, row in missing_url.iterrows():
-            if row["school_url"]:
-                match = df_ipeds[df_ipeds["url_lookup"] == row["school_url"]]
-                if not match.empty:
-                    merged.at[idx, "UNITID"] = match.iloc[0]["UNITID"]
-                    merged.at[idx, "match_method"] = "URL"
-                    url_matches += 1
-        print(f"URL matches: {url_matches}")
+    assigned = set(merged[merged["UNITID"].notna()]["UNITID"])
 
-    still_missing = merged[merged["UNITID"].isna()]["school"].unique()
+    missing = merged[merged["UNITID"].isna()]
+    url_matches = 0
+    print(f"Trying URL matching for {len(missing)} schools...")
+    for idx, row in missing.iterrows():
+        if row["school_url"]:
+            match = df_ipeds[df_ipeds["url_lookup"] == row["school_url"]]
+            if not match.empty:
+                uid = match.iloc[0]["UNITID"]
+                if uid not in assigned:
+                    merged.at[idx, "UNITID"] = uid
+                    merged.at[idx, "match_method"] = "URL"
+                    assigned.add(uid)
+                    url_matches += 1
+    print(f"URL matches: {url_matches}")
+
+    miss = merged[merged["UNITID"].isna()]["school"].unique()
     fuzzy_matches = 0
     unmatched = []
-    if len(still_missing) > 0:
-        print(f"{len(still_missing)} schools unmatched, trying fuzzy matching...")
-        ipeds_names = df_ipeds["lookup"].tolist()
-        for school in still_missing:
-            best, score = process.extractOne(normalize_name(school), ipeds_names)
-            if score >= 90:
-                matched_unitid = df_ipeds[df_ipeds["lookup"] == best]["UNITID"].values[
-                    0
+    print(f"{len(miss)} schools unmatched, trying fuzzy matching...")
+    ipeds_names = df_ipeds["lookup"].tolist()
+    for school in miss:
+        best, score = process.extractOne(normalize_name(school), ipeds_names)
+        if score >= 90:
+            uid = df_ipeds[df_ipeds["lookup"] == best]["UNITID"].values[0]
+            if uid not in assigned:
+                merged.loc[merged["school"] == school, ["UNITID", "match_method"]] = [
+                    uid,
+                    "Fuzzy",
                 ]
-                merged.loc[merged["school"] == school, "UNITID"] = matched_unitid
-                merged.loc[merged["school"] == school, "match_method"] = "Fuzzy"
+                assigned.add(uid)
                 fuzzy_matches += 1
-            else:
-                unmatched.append(school)
-        print(f"Fuzzy matches: {fuzzy_matches}")
+        else:
+            unmatched.append(school)
+    print(f"Fuzzy matches: {fuzzy_matches}")
 
     if unmatched:
         pd.DataFrame({"unmatched_school": unmatched}).to_csv(
             "unmatched_schools.csv", index=False
         )
         print(f"Saved {len(unmatched)} unmatched schools to unmatched_schools.csv")
+
+    final_matched = merged[merged["UNITID"].notna()]
+    final_matched[final_matched.duplicated(subset=["UNITID"], keep=False)]
 
     print(
         f"Matching stats -> Name: {initial_name_matches}, URL: {url_matches}, Fuzzy: {fuzzy_matches}, Unmatched: {len(unmatched)}"

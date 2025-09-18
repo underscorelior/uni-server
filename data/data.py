@@ -207,6 +207,12 @@ data = {
         "UAGRNTP",  # Percent of undergraduate students awarded federal, state, local, institutional or other sources of grant aid
         "UAGRNTA",  # Average amount of federal, state, local, institutional or other sources of grant aid awarded to undergraduate students
     ],
+    "DRVF2023": [  # Derived variables of financial data
+        "UNITID",
+        "F1ENDMFT",  # Form 1 - Endowment assets - Market value at the end of the fiscal year (Public)
+        "F2ENDMFT",  # Form 2 - Endowment assets - Market value at the end of the fiscal year (Private non-profit)
+        "F3CORREV",  # Form 3 - Core revenues (Private for-profit - used to calculate endowment per FTE)
+    ],
 }
 
 """ TABLES IGNORED:
@@ -223,7 +229,7 @@ EF2023B - Age category, gender, attendance status, and level of student (Not rea
 EFFY2023 - 12-month unduplicated headcount (Already in DRVEF122023)
 EFFY2023_HS - 12MO Headcount for Dual Enrollment Students (Not really needed)
 EFIA2023 - Instructional Activity
-DRVF2023, F2223_F1A, F2223_F2, F2223_F3 - Financial data (Not really needed)
+F2223_F1A, F2223_F2, F2223_F3 - Financial data (Not really needed)
 GR200_23 - 200% (8yr) grad rate for 2yr and 4yr (Not really needed)
 GR2023 - 150% (6yr) grad rate for 2yr and 4yr (Derived variables give it better)
 GR2023_L2 - 150% grad rate for less than 2yr institutions (Ignoring sub 2yr)
@@ -271,6 +277,10 @@ schema = {
         "CALSYS": "CAL_SYS",
         "ASSOC1": "NCAA_AFFL",
         "DIV_DIV": "NCAA_DIV",
+        "RND_SPEND": "RND_SPEND",
+        "ENDOW_FTE": "ENDOW_FTE",
+        "SCORE": "SCORE",
+        "QS_CPF": "QS_CPF",
     },
     "admissions": {
         "UNITID": "ID",
@@ -332,6 +342,7 @@ schema = {
         "GROFFER": "OFFERS_GRAD",
         "INSTSIZE": "INSTSIZE",
         "UNDUP": "TOTAL_POP",
+        "FTE12MN": "FTE_POP",
         "UNDUPUG": "UGRD_POP",
         "E12GRAD": "GRAD_POP",
         "E12FT": "FT_POP",

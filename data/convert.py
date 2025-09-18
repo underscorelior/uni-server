@@ -4,10 +4,50 @@ import subprocess
 import tempfile
 from sqlalchemy import create_engine
 from data import schema, data
+from score import scoring_components
+from gen_aliases import aliases
 import platform
 import pyodbc
 import sqlite3
-from gen_aliases import aliases
+from rich import print
+import re
+
+
+def compute_endowment_fte(row):
+    control = row.get("CNTLAFFI", -1)
+    if control == 1:
+        if pd.notnull(row.get("F1ENDMFT")):
+            return row.get("F1ENDMFT")
+        if (
+            pd.notnull(row.get("F1CORREV"))
+            and pd.notnull(row.get("FTE12MN"))
+            and row.get("FTE12MN", 0) != 0
+        ):
+            return round(row["F1CORREV"] / row["FTE12MN"])
+        return None
+    elif control in [3, 4]:
+        if pd.notnull(row.get("F2ENDMFT")):
+            return row.get("F2ENDMFT")
+        if (
+            pd.notnull(row.get("F2CORREV"))
+            and pd.notnull(row.get("FTE12MN"))
+            and row.get("FTE12MN", 0) != 0
+        ):
+            return round(row["F2CORREV"] / row["FTE12MN"])
+        return None
+
+    elif control == 2:
+        if (
+            pd.notnull(row.get("F3CORREV"))
+            and pd.notnull(row.get("FTE12MN"))
+            and row.get("FTE12MN", 0) != 0
+        ):
+            return round(row["F3CORREV"] / row["FTE12MN"])
+        if pd.notnull(row.get("F3A01")) and pd.notnull(row.get("FTE12MN")):
+            return round(row["F3A01"] / row["FTE12MN"])
+        return None
+    else:
+        return None
 
 
 def get_access_table_data(access_db_path, table_name, columns):
@@ -43,7 +83,7 @@ def get_access_table_data(access_db_path, table_name, columns):
                 return df[available_columns]
             else:
                 print(
-                    f"Warning: None of the requested columns found in table {table_name}"
+                    f"[bold orange]Warning:[/bold orange] None of the requested columns found in table {table_name}"
                 )
                 return df
         except subprocess.CalledProcessError as e:
@@ -55,16 +95,36 @@ def get_access_table_data(access_db_path, table_name, columns):
             return None
 
 
-def apply_special_cases(df, column_rename_map):
-    DIVISION_CSV = "data/ncaa_divisions.csv"
-
+def apply_special_cases(df, div_path, rnd_path, cpf_path, column_rename_map):
     if "DIV_DIV" in column_rename_map:
-        if os.path.exists(DIVISION_CSV):
-            div_df = pd.read_csv(DIVISION_CSV)
+        if not os.path.exists(div_path):
+            print(
+                f"[bold orange]Warning:[/bold orange] Division CSV '{div_path}' not found."
+            )
+        else:
+            div_df = pd.read_csv(div_path)
             df = pd.merge(df, div_df, on="UNITID", how="left")
             df.rename(columns={"div": "DIV_DIV"}, inplace=True)
+
+    if "RND_SPEND" in column_rename_map:
+        if not os.path.exists(rnd_path):
+            print(
+                f"[bold orange]Warning:[/bold orange] RnD CSV '{rnd_path}' not found."
+            )
         else:
-            print(f"Warning: Division CSV '{DIVISION_CSV}' not found.")
+            rnd_df = pd.read_csv(rnd_path)
+            df = pd.merge(df, rnd_df, on="UNITID", how="left")
+            df.rename(columns={"rnd": "RND_SPEND"}, inplace=True)
+
+    if "QS_CPF" in column_rename_map:
+        if not os.path.exists(cpf_path):
+            print(
+                f"[bold orange]Warning:[/bold orange] QS Citations CSV '{cpf_path}' not found."
+            )
+        else:
+            cpf_df = pd.read_csv(cpf_path)
+            cpf_df.rename(columns={"cpf": "QS_CPF"}, inplace=True)
+            df = pd.merge(df, cpf_df[["UNITID", "QS_CPF"]], on="UNITID", how="left")
 
     if "GALIAS" in column_rename_map:
         df["GALIAS"] = df.apply(
@@ -74,6 +134,42 @@ def apply_special_cases(df, column_rename_map):
             axis=1,
         )
 
+    if "ENDOW_FTE" in column_rename_map:
+        if all(
+            col in df.columns
+            for col in [
+                "CNTLAFFI",
+                "F1ENDMFT",
+                "F2ENDMFT",
+                "F3CORREV",
+                "FTE12MN",
+                "F1CORREV",
+                "F2CORREV",
+                "F3A01",
+            ]
+        ):
+            df["ENDOW_FTE"] = df.apply(compute_endowment_fte, axis=1)
+
+        else:
+            missing_cols = [
+                col
+                for col in [
+                    "CNTLAFFI",
+                    "F1ENDMFT",
+                    "F2ENDMFT",
+                    "F3CORREV",
+                    "FTE12MN",
+                    "F1CORREV",
+                    "F2CORREV",
+                    "F3A01",
+                ]
+                if col not in df.columns
+            ]
+            df["ENDOW_FTE"] = None
+            print(
+                f"[bold orange]Warning:[/bold orange] Cannot compute 'ENDOW_FTE' as required columns are missing: {missing_cols}"
+            )
+
     for col in list(column_rename_map.keys()):
         if col.endswith("_DUP"):
             original_col = col[:-4]
@@ -82,23 +178,18 @@ def apply_special_cases(df, column_rename_map):
                 print(f"Created '{col}' as a duplicate of '{original_col}'")
             else:
                 print(
-                    f"Warning: Cannot create '{col}' because '{original_col}' is missing."
+                    f"[bold orange]Warning:[/bold orange] Cannot create '{col}' because '{original_col}' is missing."
                 )
 
-    phone_col = None
-    for orig_col, renamed_col in column_rename_map.items():
-        if renamed_col == "PHONE":
-            phone_col = orig_col
-            break
-
-    if phone_col and phone_col in df.columns:
+    if "GENTELE" in df.columns:
 
         def clean_phone(x):
             if pd.isnull(x):
                 return None
+            x = re.sub("[^0-9]", "", x)
             return x if len(str(x)) == 10 else None
 
-        df[phone_col] = df[phone_col].apply(clean_phone)
+        df["GENTELE"] = df["GENTELE"].apply(clean_phone)
 
     pct_columns = [
         col
@@ -116,23 +207,14 @@ def apply_special_cases(df, column_rename_map):
             and df[original_col].dtype in [float, int]
         ):
             if (df[original_col] > 1).any():
-                print(f"Converting '{col}' to pct.")
                 df[original_col] = df[original_col] / 100.0
             else:
                 print(f"'{col}' already has values less than or equal to 1.")
 
-    pct_online_col = None
-    for orig_col, renamed_col in column_rename_map.items():
-        if renamed_col == "PCT_ONLINE_ONLY":
-            pct_online_col = orig_col
-            break
-
-    if pct_online_col and pct_online_col in df.columns:
-        df["ONLINE"] = df[pct_online_col].apply(
+    if "PCTE12DEEXC" in df.columns:
+        df["ONLINE"] = df["PCTE12DEEXC"].apply(
             lambda x: 1 if pd.notnull(x) and x > 0.5 else (2 if pd.notnull(x) else -1)
         )
-        print("Created 'ONLINE' column based on '{}'.".format(pct_online_col))
-
     return df
 
 
@@ -175,6 +257,73 @@ def create_descriptions_table(SQLITE_PATH):
     conn.close()
 
 
+def add_score_column(SQLITE_PATH):
+    conn = sqlite3.connect(SQLITE_PATH)
+    cursor = conn.cursor()
+
+    cursor.execute(
+        """
+        SELECT 
+            core.ID, 
+            core.ENDOW_FTE, 
+            enrollment.FTE_POP, 
+            enrollment.FT_POP, 
+            enrollment.PT_POP, 
+            admissions.APPL_TOTAL, 
+            admissions.ACC_RATE,
+            admissions.YIELD_RATE, 
+            outcomes.GRAD_RATE_6_YR, 
+            outcomes.RET_RATE_FT, 
+            outcomes.RET_RATE_PT, 
+            core.RND_SPEND,
+            core.CRN_BASIC, 
+            core.QS_CPF,
+            enrollment.ONLINE
+        FROM core
+        JOIN enrollment ON core.ID = enrollment.ID 
+        JOIN admissions ON core.ID = admissions.ID
+        JOIN outcomes ON core.ID = outcomes.ID
+        """
+    )
+    rows = cursor.fetchall()
+
+    df = pd.DataFrame(
+        rows,
+        columns=[
+            "ID",
+            "ENDOW_FTE",
+            "FTE_POP",
+            "FT_POP",
+            "PT_POP",
+            "APPL_TOTAL",
+            "ACC_RATE",
+            "YIELD_RATE",
+            "GRAD_RATE_6_YR",
+            "RET_RATE_FT",
+            "RET_RATE_PT",
+            "RND_SPEND",
+            "CRN_BASIC",
+            "QS_CPF",
+            "ONLINE",
+        ],
+    )
+    df = df.fillna(0)
+    df.insert(0, "SCORE", 0)
+
+    df["SCORE"] = df.apply(lambda r: scoring_components(r, df), axis=1)
+    df["SCORE"] = df["SCORE"].apply(lambda c: sum(c.values()))
+
+    cursor.execute("ALTER TABLE core ADD COLUMN SCORE REAL")
+    for _, row in df.iterrows():
+        cursor.execute(
+            "UPDATE core SET SCORE = ? WHERE ID = ?", (row["SCORE"], row["ID"])
+        )
+    conn.commit()
+    conn.close()
+
+    print(df.head(15))
+
+
 def get_source_table_for_col(column_name, schema):
     for table, columns in schema.items():
         if column_name in columns:
@@ -186,9 +335,14 @@ def main():
     ACCESS_DB_PATH = "data/IPEDS202324.accdb"
     SQL_OUTPUT_PATH = "data/universities.sqlite"
     DESCRIPTIONS_CSV_PATH = "data/descriptions.csv"
+    DIVISION_CSV = "data/ncaa_divisions.csv"
+    RND_CSV = "data/rnd_spending.csv"
+    CPF_CSV = "data/qs_citations.csv"
 
     if not os.path.exists(ACCESS_DB_PATH):
-        print(f"Error: Access database not found at '{ACCESS_DB_PATH}'")
+        print(
+            f"[red bold]Error[/red bold]: Access database not found at '{ACCESS_DB_PATH}'"
+        )
         return
 
     if os.path.exists(SQL_OUTPUT_PATH):
@@ -223,6 +377,15 @@ def main():
             if source_table:
                 source_tables_to_query.setdefault(source_table, set()).add(col)
 
+        if "ENDOW_FTE" in rnmp:
+            source_tables_to_query.setdefault("DRVF2023", set()).update(
+                ["F1ENDMFT", "F1CORREV", "F2ENDMFT", "F2CORREV", "F3CORREV"]
+            )
+
+            source_tables_to_query.setdefault("F2223_F3", set()).add("F3A01")
+            source_tables_to_query.setdefault("DRVEF122023", set()).add("FTE12MN")
+
+        # NOTE: Maybe save ID of all filtered colleges to prevent recalling this
         if "HD2023" not in source_tables_to_query:
             source_tables_to_query["HD2023"] = set()
         source_tables_to_query["HD2023"].update(filter_columns)
@@ -261,7 +424,9 @@ def main():
         ].copy()
         print(f"  Filtered {initial_rows} records down to {len(filtered_df)}.")
 
-        filtered_df = apply_special_cases(filtered_df, rnmp)
+        filtered_df = apply_special_cases(
+            filtered_df, DIVISION_CSV, RND_CSV, CPF_CSV, rnmp
+        )
 
         final_cols_original_names = [
             col for col in rnmp.keys() if col in filtered_df.columns
@@ -288,19 +453,20 @@ def main():
 
     print("\nCreating 'descriptions' table...")
     create_descriptions_table(SQL_OUTPUT_PATH)
-    print("Table 'descriptions' created successfully.")
 
-    print("\nImporting descriptions from CSV...")
+    print("\nScoring colleges...")
+    add_score_column(SQL_OUTPUT_PATH)
+
     if os.path.exists(DESCRIPTIONS_CSV_PATH):
         descriptions_df = pd.read_csv(DESCRIPTIONS_CSV_PATH, dtype={"UNITID": str})
         descriptions_df.to_sql("descriptions", engine, if_exists="replace", index=False)
-        print(f"Descriptions imported from '{DESCRIPTIONS_CSV_PATH}'")
-    else:
-        print(f"Warning: Descriptions CSV '{DESCRIPTIONS_CSV_PATH}' not found.")
-
-    if os.path.exists(DESCRIPTIONS_CSV_PATH):
         os.remove(DESCRIPTIONS_CSV_PATH)
-        print(f"Deleted temporary file '{DESCRIPTIONS_CSV_PATH}'")
+        print(f"Descriptions imported from '{DESCRIPTIONS_CSV_PATH}'")
+
+    else:
+        print(
+            f"[bold orange]Warning:[/bold orange] Descriptions CSV '{DESCRIPTIONS_CSV_PATH}' not found."
+        )
 
 
 if __name__ == "__main__":

@@ -36,6 +36,9 @@ type CoreInfo = {
 	cal_sys: string | null;
 	ncaa_affl: boolean | null;
 	ncaa_div: number | null;
+	rnd_spend: number | null;
+	endow_fte: number | null;
+	score: number;
 };
 
 type Admissions = {
@@ -109,6 +112,7 @@ type EnrollmentInfo = {
 	offers_grad: boolean | null;
 	instsize: string;
 	total_pop: number;
+	fte_pop: number;
 	ugrd_pop: number;
 	grad_pop: number;
 	ft_pop: number;
