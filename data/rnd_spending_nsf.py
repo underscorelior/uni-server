@@ -41,7 +41,7 @@ def _load_windows(accdb_path, hd):
         f"DRIVER={{Microsoft Access Driver (*.mdb, *.accdb)}};DBQ={os.getcwd()}/{accdb_path};"
     )
     df_hd = pd.read_sql(
-        f"SELECT UNITID, INSTNM FROM {hd.replace(".csv", "").split("/")[-1]}",
+        f"SELECT UNITID, INSTNM FROM {hd}",
         conn,
         dtype={"UNITID": str},
     )
@@ -52,10 +52,10 @@ def _load_windows(accdb_path, hd):
 def _load_mac(accdb_path, hd):
     subprocess.run(["which", "mdb-export"], check=True, capture_output=True)
     with tempfile.TemporaryDirectory() as tmp:
-        hd_csv = os.path.join(tmp, hd)
+        hd_csv = os.path.join(tmp, hd + ".csv")
         with open(hd_csv, "w") as f:
             subprocess.run(
-                ["mdb-export", accdb_path, hd.replace("csv", "")],
+                ["mdb-export", accdb_path, hd],
                 stdout=f,
                 check=True,
             )
@@ -73,11 +73,8 @@ def load_ipeds(accdb_path, hd):
                 return _load_mac(accdb_path, hd)
         except Exception:
             pass
-    if os.path.exists(hd):
-        df_hd = pd.read_csv(hd, encoding="latin1", dtype={"UNITID": str})
-        return _finalize(df_hd)
 
-    raise FileNotFoundError("Neither ACCDB nor CSV files found")
+    raise FileNotFoundError("ACCDB file not found")
 
 
 def load_spending(EXCEL_PATH):
@@ -93,9 +90,9 @@ def load_spending(EXCEL_PATH):
 
 
 def main():
-    EXCEL_PATH = "data/nsf25314-tab022.xlsx"
-    ACCDB_PATH = "data/IPEDS202324.accdb"
-    HD_PATH = "data/HD2023.csv"
+    EXCEL_PATH = "data/sources/nsf25314-tab022.xlsx"
+    ACCDB_PATH = "data/sources/IPEDS202324.accdb"
+    HD_TBL = "HD2023"
 
     HARDCODED_FIXES = {
         "Georgia Institute": "139755",
@@ -145,7 +142,7 @@ def main():
     }
 
     df_spend = load_spending(EXCEL_PATH)
-    df_ipeds = load_ipeds(ACCDB_PATH, HD_PATH)
+    df_ipeds = load_ipeds(ACCDB_PATH, HD_TBL)
     df_spend["lookup"] = df_spend["inst"].apply(normalize)
     df_merged = df_spend.merge(
         df_ipeds, on="lookup", how="left", suffixes=("", "_ipeds")
@@ -172,7 +169,7 @@ def main():
     if len(unmatched) > 0:
         print(f"Unmatched schools: {unmatched}")
     df_new = df_merged[["UNITID", "rnd"]]
-    df_new.to_csv("data/rnd_spending.csv", index=False)
+    df_new.to_csv("data/out/rnd_spending.csv", index=False)
 
 
 if __name__ == "__main__":

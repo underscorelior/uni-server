@@ -59,17 +59,12 @@ def _finalize(df_ic: pd.DataFrame, df_hd: pd.DataFrame) -> pd.DataFrame:
 def _load_windows(accdb_path, ic, hd):
     import pyodbc
 
-    table_ic = ic.replace(".csv", "").split("/")[-1]
-    table_hd = hd.replace(".csv", "").split("/")[-1]
-
     conn = pyodbc.connect(
         f"DRIVER={{Microsoft Access Driver (*.mdb, *.accdb)}};DBQ={os.getcwd()}/{accdb_path};"
     )
-    df_ic = pd.read_sql(
-        f"SELECT UNITID, ASSOC1 FROM {table_ic}", conn, dtype={"UNITID": str}
-    )
+    df_ic = pd.read_sql(f"SELECT UNITID, ASSOC1 FROM {ic}", conn, dtype={"UNITID": str})
     df_hd = pd.read_sql(
-        f"SELECT UNITID, INSTNM, WEBADDR FROM {table_hd}", conn, dtype={"UNITID": str}
+        f"SELECT UNITID, INSTNM, WEBADDR FROM {hd}", conn, dtype={"UNITID": str}
     )
     conn.close()
     return _finalize(df_ic, df_hd)
@@ -78,24 +73,19 @@ def _load_windows(accdb_path, ic, hd):
 def _load_mac(accdb_path, ic, hd):
     subprocess.run(["which", "mdb-export"], check=True, capture_output=True)
     with tempfile.TemporaryDirectory() as tmp:
-        ic_csv = os.path.join(tmp, ic)
-        hd_csv = os.path.join(tmp, hd)
+        ic_csv = os.path.join(tmp, ic + ".csv")
+        hd_csv = os.path.join(tmp, hd + ".csv")
         for tbl, out in [(ic, ic_csv), (hd, hd_csv)]:
             with open(out, "w") as f:
+                print(f"Running mdb-export for {tbl}...")
                 subprocess.run(
-                    ["mdb-export", accdb_path, tbl.replace("csv", "")],
+                    ["mdb-export", accdb_path, tbl],
                     stdout=f,
                     check=True,
                 )
 
         df_ic = pd.read_csv(ic_csv, dtype={"UNITID": str})
         df_hd = pd.read_csv(hd_csv, dtype={"UNITID": str})
-    return _finalize(df_ic, df_hd)
-
-
-def _load_csv(ic, hd):
-    df_ic = pd.read_csv(ic, encoding="latin1", dtype={"UNITID": str})
-    df_hd = pd.read_csv(hd, encoding="latin1", dtype={"UNITID": str})
     return _finalize(df_ic, df_hd)
 
 
@@ -108,9 +98,7 @@ def load_ipeds(accdb_path, ic, hd):
                 return _load_mac(accdb_path, ic, hd)
         except Exception:
             pass
-    if os.path.exists(ic) and os.path.exists(hd):
-        return _load_csv(ic, hd)
-    raise FileNotFoundError("Neither ACCDB nor CSV files found")
+    raise FileNotFoundError("ACCDB file not found")
 
 
 def merge_ncaa_ipeds(df_ncaa, df_ipeds):
@@ -181,16 +169,16 @@ def build_division_mapping(df_merged, df_ipeds):
 
 
 def main():
-    ACCDB_PATH = "data/IPEDS202324.accdb"
-    IC_PATH = "data/IC2023.csv"
-    HD_PATH = "data/HD2023.csv"
+    ACCDB_PATH = "data/sources/IPEDS202324.accdb"
+    IC_TBL = "IC2023"
+    HD_TBL = "HD2023"
 
     df_ncaa = get_ncaa_data()
-    df_ipeds = load_ipeds(accdb_path=ACCDB_PATH, ic=IC_PATH, hd=HD_PATH)
+    df_ipeds = load_ipeds(accdb_path=ACCDB_PATH, ic=IC_TBL, hd=HD_TBL)
     df_merged = merge_ncaa_ipeds(df_ncaa, df_ipeds)
     final = build_division_mapping(df_merged, df_ipeds)
-    final.to_csv("data/ncaa_divisions.csv", index=False)
-    print(f"Saved {len(final)} rows to data/ncaa_divisions.csv")
+    final.to_csv("data/out/ncaa_divisions.csv", index=False)
+    print(f"Saved {len(final)} rows to data/out/ncaa_divisions.csv")
 
 
 if __name__ == "__main__":

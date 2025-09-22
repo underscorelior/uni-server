@@ -1,4 +1,3 @@
-# CONVERTS TABLE 22 OF THE NSF HERD REPORT TO CSV TO BE USED IN DB
 import platform
 import pandas as pd
 from thefuzz import process
@@ -14,11 +13,7 @@ def normalize(name: str) -> str:
     return re.sub(
         r"[^a-z0-9]",
         "",
-        re.sub(
-            r"\[.*?\]|\(.*?\)",
-            "",
-            name,
-        ).lower(),
+        re.sub(r"\[.*?\]|\(.*?\)", "", name).lower(),
     )
 
 
@@ -35,7 +30,7 @@ def _load_windows(accdb_path, hd):
         f"DRIVER={{Microsoft Access Driver (*.mdb, *.accdb)}};DBQ={os.getcwd()}/{accdb_path};"
     )
     df_hd = pd.read_sql(
-        f"SELECT UNITID, INSTNM FROM {hd.replace(".csv", "").split("/")[-1]}",
+        f"SELECT UNITID, INSTNM FROM {hd}",
         conn,
         dtype={"UNITID": str},
     )
@@ -46,10 +41,10 @@ def _load_windows(accdb_path, hd):
 def _load_mac(accdb_path, hd):
     subprocess.run(["which", "mdb-export"], check=True, capture_output=True)
     with tempfile.TemporaryDirectory() as tmp:
-        hd_csv = os.path.join(tmp, hd)
+        hd_csv = os.path.join(tmp, hd + ".csv")
         with open(hd_csv, "w") as f:
             subprocess.run(
-                ["mdb-export", accdb_path, hd.replace("csv", "")],
+                ["mdb-export", accdb_path, hd],
                 stdout=f,
                 check=True,
             )
@@ -67,11 +62,8 @@ def load_ipeds(accdb_path, hd):
                 return _load_mac(accdb_path, hd)
         except Exception:
             pass
-    if os.path.exists(hd):
-        df_hd = pd.read_csv(hd, encoding="latin1", dtype={"UNITID": str})
-        return _finalize(df_hd)
 
-    raise FileNotFoundError("Neither ACCDB nor CSV files found")
+    raise FileNotFoundError("ACCDB file not found")
 
 
 def load_citations(QS_FILE):
@@ -87,9 +79,9 @@ def load_citations(QS_FILE):
 
 
 def main():
-    QS_FILE = "data/qs.tsv"
-    ACCDB_PATH = "data/IPEDS202324.accdb"
-    HD_PATH = "data/HD2023.csv"
+    QS_FILE = "data/sources/qs.tsv"
+    ACCDB_PATH = "data/sources/IPEDS202324.accdb"
+    HD_TBL = "HD2023"
 
     HARDCODED_FIXES = {
         "The City College of New York": "190567",
@@ -102,7 +94,7 @@ def main():
         "University of Minnesota (System)": "174066",
     }
     df_cpf = load_citations(QS_FILE)
-    df_ipeds = load_ipeds(ACCDB_PATH, HD_PATH)
+    df_ipeds = load_ipeds(ACCDB_PATH, HD_TBL)
     df_cpf["lookup"] = df_cpf["inst"].apply(normalize)
     df_merged = df_cpf.merge(df_ipeds, on="lookup", how="left", suffixes=("", "_ipeds"))
     unmatched = df_merged[df_merged["UNITID"].isna()]["inst"].unique()
@@ -127,7 +119,7 @@ def main():
     if len(unmatched) > 0:
         print(f"Unmatched schools: {unmatched}")
     df_new = df_merged[["UNITID", "cpf"]]
-    df_new.to_csv("data/qs_citations.csv", index=False)
+    df_new.to_csv("data/out/qs_citations.csv", index=False)
 
 
 if __name__ == "__main__":

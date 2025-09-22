@@ -7,10 +7,12 @@ from data import schema, data
 from score import scoring_components
 from gen_aliases import aliases
 import platform
-import pyodbc
 import sqlite3
 from rich import print
 import re
+
+if platform.system() == "Windows":
+    import pyodbc
 
 
 def compute_endowment_fte(row):
@@ -332,12 +334,12 @@ def get_source_table_for_col(column_name, schema):
 
 
 def main():
-    ACCESS_DB_PATH = "data/IPEDS202324.accdb"
+    ACCESS_DB_PATH = "data/sources/IPEDS202324.accdb"
     SQL_OUTPUT_PATH = "data/universities.sqlite"
-    DESCRIPTIONS_CSV_PATH = "data/descriptions.csv"
-    DIVISION_CSV = "data/ncaa_divisions.csv"
-    RND_CSV = "data/rnd_spending.csv"
-    CPF_CSV = "data/qs_citations.csv"
+    DESCRIPTIONS_CSV_PATH = "data/out/descriptions.csv"
+    DIVISION_CSV = "data/out/ncaa_divisions.csv"
+    RND_CSV = "data/out/rnd_spending.csv"
+    CPF_CSV = "data/out/qs_citations.csv"
 
     if not os.path.exists(ACCESS_DB_PATH):
         print(
