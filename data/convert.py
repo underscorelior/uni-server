@@ -97,7 +97,7 @@ def get_access_table_data(access_db_path, table_name, columns):
             return None
 
 
-def apply_special_cases(df, div_path, rnd_path, cpf_path, column_rename_map):
+def apply_special_cases(df, div_path, found_csv, rnd_path, cpf_path, column_rename_map):
     if "DIV_DIV" in column_rename_map:
         if not os.path.exists(div_path):
             print(
@@ -107,6 +107,16 @@ def apply_special_cases(df, div_path, rnd_path, cpf_path, column_rename_map):
             div_df = pd.read_csv(div_path)
             df = pd.merge(df, div_df, on="UNITID", how="left")
             df.rename(columns={"div": "DIV_DIV"}, inplace=True)
+
+    if "YEAR" in column_rename_map:
+        if not os.path.exists(found_csv):
+            print(
+                f"[bold orange]Warning:[/bold orange] Founding year CSV '{found_csv}' not found."
+            )
+        else:
+            div_df = pd.read_csv(found_csv)
+            df = pd.merge(df, div_df, on="UNITID", how="left")
+            df.rename(columns={"foundyr": "YEAR"}, inplace=True)
 
     if "RND_SPEND" in column_rename_map:
         if not os.path.exists(rnd_path):
@@ -245,6 +255,32 @@ def create_search_view(SQLITE_PATH):
     conn.close()
 
 
+def create_list_view(SQLITE_PATH):
+    conn = sqlite3.connect(SQLITE_PATH)
+    conn.execute(
+        """
+        CREATE VIEW IF NOT EXISTS list AS
+        SELECT
+            core.ID,
+            core.NAME,
+            core.URL,
+            core.CITY,
+            core.STATE,
+            core.YEAR,
+            core.INST_CONTROL,
+            core.SCORE,
+            enrollment.FTE_POP,
+            admissions.ACC_RATE
+        FROM
+            core
+        JOIN enrollment ON core.ID = enrollment.ID
+        JOIN admissions ON core.ID = admissions.ID;
+        """
+    )
+    conn.commit()
+    conn.close()
+
+
 def create_descriptions_table(SQLITE_PATH):
     conn = sqlite3.connect(SQLITE_PATH)
     conn.execute(
@@ -340,6 +376,7 @@ def main():
     DIVISION_CSV = "data/out/ncaa_divisions.csv"
     RND_CSV = "data/out/rnd_spending.csv"
     CPF_CSV = "data/out/qs_citations.csv"
+    FOUND_CSV = "data/out/founding.csv"
 
     if not os.path.exists(ACCESS_DB_PATH):
         print(
@@ -349,10 +386,14 @@ def main():
 
     if os.path.exists(SQL_OUTPUT_PATH):
         conn = sqlite3.connect(SQL_OUTPUT_PATH)
-        df = pd.read_sql("SELECT * FROM descriptions", conn)
+        try:
+            df = pd.read_sql("SELECT * FROM descriptions", conn)
+            df.to_csv(DESCRIPTIONS_CSV_PATH, index=False)
+            print(f"Saved existing descriptions to '{DESCRIPTIONS_CSV_PATH}'")
+        except Exception as _:
+            print("Descriptions not found")
+            open(DESCRIPTIONS_CSV_PATH)
         conn.close()
-        df.to_csv(DESCRIPTIONS_CSV_PATH, index=False)
-        print(f"Saved existing descriptions to '{DESCRIPTIONS_CSV_PATH}'")
 
     os.makedirs(os.path.dirname(SQL_OUTPUT_PATH), exist_ok=True)
     if os.path.exists(SQL_OUTPUT_PATH):
@@ -387,7 +428,7 @@ def main():
             source_tables_to_query.setdefault("F2223_F3", set()).add("F3A01")
             source_tables_to_query.setdefault("DRVEF122023", set()).add("FTE12MN")
 
-        # NOTE: Maybe save ID of all filtered colleges to prevent recalling this
+        # TODO: Maybe save ID of all filtered colleges to prevent recalling this
         if "HD2023" not in source_tables_to_query:
             source_tables_to_query["HD2023"] = set()
         source_tables_to_query["HD2023"].update(filter_columns)
@@ -427,7 +468,7 @@ def main():
         print(f"  Filtered {initial_rows} records down to {len(filtered_df)}.")
 
         filtered_df = apply_special_cases(
-            filtered_df, DIVISION_CSV, RND_CSV, CPF_CSV, rnmp
+            filtered_df, DIVISION_CSV, FOUND_CSV, RND_CSV, CPF_CSV, rnmp
         )
 
         final_cols_original_names = [
@@ -449,9 +490,11 @@ def main():
 
     print(f"\nSuccess! All tables exported to '{SQL_OUTPUT_PATH}'")
 
-    print("\nCreating 'search' view...")
+    print("\nCreating 'search' and 'list' views...")
     create_search_view(SQL_OUTPUT_PATH)
-    print("View created successfully.")
+    print("Created 'search' view successfully.")
+    create_list_view(SQL_OUTPUT_PATH)
+    print("Created 'list' view successfully.")
 
     print("\nCreating 'descriptions' table...")
     create_descriptions_table(SQL_OUTPUT_PATH)

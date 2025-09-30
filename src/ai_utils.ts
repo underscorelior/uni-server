@@ -17,7 +17,8 @@ export async function generateDescription(
 		return info as DBError;
 	}
 
-	// TODO: PREVENT HAVING ISSUES WITH "Data not provided" or something.
+	// TODO: PREVENT HAVING ISSUES WITH "Data not provided" or something. - http://localhost:3000/info/215062
+	// TODO: http://localhost:3000/info/240620 wtf??
 
 	const prompt = `Your Role: You are an expert copywriter for a leading college information platform.
 
@@ -27,8 +28,6 @@ CRITICAL INSTRUCTIONS
 Strict Data Adherence: You MUST use ONLY the data provided for all statistics, figures, and specific details.
 
 NO STATISTICAL HALLUCINATION: Do not, under any circumstances, invent, estimate, or infer any numerical data. If a statistic is not present in the provided JSON, you must not mention it.
-
-Single Exception - Founding Date: The only piece of information you are permitted to find from external knowledge is the university's founding date. You may include a phrase like "Founded in [Year]...". If you are unsure of the founding date, simply omit it from your description.
 
 Handling Missing Data: If a data point is null or missing, simply omit that information. Do not write "data not available."
 
@@ -43,7 +42,9 @@ Introduction: Combine the university's name (${info.core.name}), location (${
 		info.core.city
 	}, ${info.core.state}), and type (${
 		info.core.inst_control
-	}) in the opening sentence with its founding date. Based on the text in ${
+	}) in the opening sentence with its founding date (${
+		info.core.year
+	}). Based on the text in ${
 		info.core.crn_ugrd
 	}, describe its selectivity (e.g., if the text contains "more selective," describe it as "highly selective"; if it contains "selective," describe it as "selective"). If ${
 		info.core.relig_control

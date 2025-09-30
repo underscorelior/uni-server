@@ -20,6 +20,7 @@ type CoreInfo = {
 	latitude: number;
 	phone?: number;
 	url: string;
+	year: number | null;
 	hgh_deg: string | boolean | null;
 	hospital: boolean | null;
 	med_deg: boolean | null;
@@ -105,6 +106,10 @@ type Admissions = {
 		math_75: number | null;
 	};
 	ap_credit: boolean | null;
+	ug_app_fee: number;
+	gr_app_fee: number;
+	adm_url: string | null;
+	appl_url: string | null;
 };
 
 type EnrollmentInfo = {
@@ -137,8 +142,6 @@ type EnrollmentInfo = {
 };
 
 type Costs = {
-	ug_app_fee: number;
-	gr_app_fee: number;
 	net_calc_url: string;
 	tuit_vary: boolean | null;
 	offers_housing: boolean | null;
@@ -184,9 +187,7 @@ type Outcomes = {
 };
 
 type Services = {
-	adm_url: string | null;
 	faid_url: string | null;
-	appl_url: string | null;
 	rotc: boolean | null;
 	study_abroad: boolean | null;
 	teacher_cert: boolean | null;
@@ -238,4 +239,23 @@ interface SearchResult {
 	city: string;
 	state: string;
 	online: boolean | null; // TODO: Add 'online' badge if its an online college to differentiate
+}
+
+interface CollegeList {
+	count: number;
+	offset: number; // MAYBE NOT NEEDED
+	list: ListItem[];
+}
+
+interface ListItem {
+	id: number;
+	name: string;
+	url: string;
+	city: string;
+	state: string;
+	year: number | null;
+	inst_control: number;
+	fte_pop: number;
+	acc_rate: number;
+	score: number;
 }

@@ -4,6 +4,8 @@ import {
 	deleteDescription,
 	description,
 	getData,
+	getValues,
+	list,
 	search,
 } from './data_out';
 
@@ -18,6 +20,46 @@ app.get('/api/search', async (req: Request, res: Response): Promise<void> => {
 	res.json(result);
 });
 
+app.get('/api/list', async (req: Request, res: Response): Promise<void> => {
+	const result = await list(
+		(req.query.filter as string) || '',
+		(req.query.offset as unknown as number) || 0,
+		(req.query.limit as unknown as number) || 50
+	);
+
+	if ('status' in result) {
+		res.status(result.status).json({ message: result.message });
+		return;
+	}
+	res.json(result);
+});
+
+app.get(
+	'/api/get-values',
+	async (req: Request, res: Response): Promise<void> => {
+		const table = req.query.table;
+		const col = req.query.col;
+
+		if (!table || Number.isInteger(Number(table))) {
+			res.status(400).json({ message: 'Invalid table parameter' });
+			return;
+		}
+
+		if (!table || Number.isInteger(Number(table))) {
+			res.status(400).json({ message: 'Invalid col parameter' });
+			return;
+		}
+
+		const output = await getValues(String(table), String(col));
+
+		if ('status' in output) {
+			res.status(output.status).json({ message: output.message });
+			return;
+		}
+
+		res.json(output);
+	}
+);
 // app.get('/test/ai', async (req: Request, res: Response): Promise<void> => {
 // 	const id = req.query.id;
 // 	const del = req.query.del;

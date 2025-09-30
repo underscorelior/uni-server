@@ -66,6 +66,7 @@ export async function core(id: number): Promise<CoreInfo | DBError> {
 	return output as CoreInfo;
 }
 
+// TODO: Improve the splitting
 export async function admissions(id: number): Promise<Admissions | DBError> {
 	const result = await query<Admissions>('admissions', id);
 	if ('status' in result) {
@@ -96,9 +97,10 @@ export async function admissions(id: number): Promise<Admissions | DBError> {
 				],
 			};
 		} else if (
-			key.startsWith('sat_') ||
-			key.startsWith('act_') ||
-			key.startsWith('adm_')
+			(key.startsWith('sat_') ||
+				key.startsWith('act_') ||
+				key.startsWith('adm_')) &&
+			!key.endsWith('url')
 		) {
 			if (!(output as any)[key.slice(0, 3)]) {
 				(output as any)[key.slice(0, 3)] = {} as Admissions[
@@ -107,7 +109,10 @@ export async function admissions(id: number): Promise<Admissions | DBError> {
 					| 'adm'];
 			}
 			(output as any)[key.slice(0, 3)][key.slice(4)] = value;
-		} else if (key.startsWith('appl_') || key.startsWith('enrl_')) {
+		} else if (
+			(key.startsWith('appl_') || key.startsWith('enrl_')) &&
+			!key.endsWith('url')
+		) {
 			if (!(output as any)[key.slice(0, 4)]) {
 				(output as any)[key.slice(0, 4)] = {} as Admissions[
 					| 'appl'
@@ -463,6 +468,81 @@ export async function description(id: number): Promise<string | DBError> {
 		}
 
 		return result.description;
+	} catch (error) {
+		console.error('Error fetching description:', error);
+		return { status: 500, message: 'Database query error' } as DBError;
+	}
+}
+
+export async function list(
+	filter: string,
+	offset: number,
+	limit: number
+): Promise<CollegeList[] | DBError> {
+	// query format: "x=y" ex. "state=CA:size>5000"
+	console.log(filter);
+	try {
+		let rows: CollegeList[] = [];
+		const db = await open({
+			filename: 'data/universities.sqlite',
+			driver: sqlite3.Database,
+		});
+
+		const where = [] as string[];
+		filter.split(':').forEach((f) => {
+			where.push(
+				` ${f.split('=')[0].trim()}${
+					f.split('=')[1].includes(',') ? ' IN (' : "= '"
+				}${f.split('=')[1].trim()}${
+					f.split('=')[1].includes(',') ? ')' : "'"
+				}`
+			);
+		}); // TODO: Improve this to not be so messy
+
+		const result = await db.all<CollegeList[]>(
+			`SELECT * FROM list ${
+				filter ? `WHERE ${where.join(' AND ')}` : ''
+			} ORDER BY score DESC LIMIT ? OFFSET ?`,
+			limit,
+			offset
+		);
+
+		rows = result ?? [];
+
+		await db.close();
+
+		return rows;
+	} catch (error) {
+		console.error('Error fetching description:', error);
+		return { status: 500, message: 'Database query error' } as DBError;
+	}
+}
+
+export async function getValues(
+	table: string,
+	col: string
+): Promise<string[] | DBError> {
+	try {
+		let rows: string[] = [];
+		const db = await open({
+			filename: 'data/universities.sqlite',
+			driver: sqlite3.Database,
+		});
+
+		const result = await db.all<string[]>(
+			`SELECT DISTINCT ${col} FROM ${table}`
+		);
+
+		rows =
+			result
+				.map((row) => {
+					return row[col];
+				})
+				.sort() ?? [];
+
+		await db.close();
+
+		return rows;
 	} catch (error) {
 		console.error('Error fetching description:', error);
 		return { status: 500, message: 'Database query error' } as DBError;
