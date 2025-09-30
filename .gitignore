@@ -8,9 +8,9 @@ test_*.py
 package-lock.json
 
 *.accdb
-*.csv
 __pycache__/
 *.pyc
 .DS_Store
 
 data/research/
+data/out/

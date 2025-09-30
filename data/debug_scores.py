@@ -6,7 +6,7 @@ from rich import print
 
 from score import scoring_components
 
-conn = sqlite3.connect("data/sources/universities.sqlite")
+conn = sqlite3.connect("data/universities.sqlite")
 cursor = conn.cursor()
 cursor.execute(
     """
