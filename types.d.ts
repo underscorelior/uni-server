@@ -12,7 +12,7 @@ interface UniversityInfo {
 
 type CoreInfo = {
 	name: string;
-	alias: string; // TODO: Find a way to properly parse aliases
+	alias: string;
 	address: string;
 	city: string;
 	state: string;
@@ -58,32 +58,32 @@ type Admissions = {
 		con_legacy: { name: string | null; value: string | null };
 	};
 	appl: {
-		men: number | null;
-		women: number | null;
+		male: number | null;
+		female: number | null;
 		other: number | null;
 		unknown: number | null;
 		total: number | null;
 	};
 	adm: {
-		men: number | null;
-		women: number | null;
+		male: number | null;
+		female: number | null;
 		other: number | null;
 		unknown: number | null;
 		total: number | null;
 	};
 	enrl: {
-		men: number | null;
-		women: number | null;
+		male: number | null;
+		female: number | null;
 		other: number | null;
 		unknown: number | null;
 		total: number | null;
 	};
 	acc_rate: number | null;
-	acc_rate_men: number | null;
-	acc_rate_women: number | null;
+	acc_rate_male: number | null;
+	acc_rate_female: number | null;
 	yield_rate: number | null;
-	yield_rate_men: number | null;
-	yield_rate_women: number | null;
+	yield_rate_male: number | null;
+	yield_rate_female: number | null;
 	sat: {
 		pct: number | null;
 		rw_25: number | null;
@@ -132,7 +132,7 @@ type EnrollmentInfo = {
 		two: number;
 		unknown: number;
 		nonresident: number;
-		women: number;
+		female: number;
 		online_only: number;
 		some_online: number;
 		no_online: number;
@@ -238,7 +238,7 @@ interface SearchResult {
 	name: string;
 	city: string;
 	state: string;
-	online: boolean | null; // TODO: Add 'online' badge if its an online college to differentiate
+	online: boolean | null;
 }
 
 interface CollegeList {
