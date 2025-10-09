@@ -19,6 +19,7 @@ export async function generateDescription(
 
 	// TODO: PREVENT HAVING ISSUES WITH "Data not provided" or something. - http://localhost:3000/info/215062
 	// TODO: http://localhost:3000/info/240620 wtf??
+	// BUG: http://localhost:3000/info/183789 - "NCAA DIVISION 0"
 
 	const prompt = `Your Role: You are an expert copywriter for a leading college information platform.
 
@@ -81,11 +82,10 @@ Academic Outcomes: Include the six-year graduation rate (${
 		info.outcomes.grad_rate_6_yr
 	}) and the student-to-faculty ratio (${info.outcomes.stu_fac}).
 
-Athletics: If ${
-		info.core.ncaa_affl
-	} is true, mention that the university is an NCAA member and state its division (${
-		info.core.ncaa_div
-	}).`;
+${
+	info.core.ncaa_affl &&
+	`Athletics: Mention that the university is an NCAA member and state its division (${info.core.ncaa_div})`
+}.`;
 	console.log(prompt);
 	const response = await fetch(AI_URL, {
 		method: 'POST',

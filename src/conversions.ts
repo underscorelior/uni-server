@@ -8,10 +8,14 @@ const common = {
 export const COMMON_CONV = common;
 
 const hgh_deg = {
-	'11': "Doctor's degree - research/scholarship and professional practice",
-	'12': "Doctor's degree - research/scholarship",
-	'13': "Doctor's degree -  professional practice",
-	'14': "Doctor's degree - other",
+	// '11': "Doctor's degree - research/scholarship and professional practice",
+	// '12': "Doctor's degree - research/scholarship",
+	// '13': "Doctor's degree -  professional practice",
+	// '14': "Doctor's degree - other",
+	'11': 'Doctoral degree',
+	'12': 'Doctoral degree',
+	'13': 'Doctoral degree',
+	'14': 'Doctoral degree',
 	'20': "Master's degree",
 	'30': "Bachelor's degree",
 	'40': "Associate's degree",
@@ -214,9 +218,9 @@ const cal_sys = {
 	'1': 'Semester',
 	'2': 'Quarter',
 	'3': 'Trimester',
-	'4': 'Four-one-four plan',
-	'5': 'Other academic year',
-	'6': 'Differs by program',
+	'4': 'Four-one-four',
+	'5': 'Other',
+	'6': 'Differs',
 	'7': 'Continuous',
 	'-2': null,
 };
@@ -238,9 +242,9 @@ export const INFO_CONV = {
 };
 
 const considerations = {
-	'1': 'Required to be considered for admission',
-	'5': 'Not required for admission, but considered if submitted',
-	'3': 'Not considered for admission, even if submitted',
+	'1': 'Required',
+	'5': 'Considered',
+	'3': 'Not Considered',
 	'-1': null,
 	'-2': null,
 };
