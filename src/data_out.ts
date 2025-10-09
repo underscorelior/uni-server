@@ -480,7 +480,6 @@ export async function list(
 	limit: number
 ): Promise<CollegeList[] | DBError> {
 	// query format: "x=y" ex. "state=CA:size>5000"
-	console.log(filter);
 	try {
 		let rows: CollegeList[] = [];
 		const db = await open({
@@ -489,14 +488,19 @@ export async function list(
 		});
 
 		const where = [] as string[];
+
 		filter.split(':').forEach((f) => {
-			where.push(
-				` ${f.split('=')[0].trim()}${
+			let out = '';
+			if (!(f.length >= 2)) return;
+
+			if (f.includes('=')) {
+				out = ` ${f.split('=')[0].trim()}${
 					f.split('=')[1].includes(',') ? ' IN (' : "= '"
 				}${f.split('=')[1].trim()}${
 					f.split('=')[1].includes(',') ? ')' : "'"
-				}`
-			);
+				}`;
+			}
+			where.push(out);
 		}); // TODO: Improve this to not be so messy
 
 		const result = await db.all<CollegeList[]>(
@@ -513,7 +517,7 @@ export async function list(
 
 		return rows;
 	} catch (error) {
-		console.error('Error fetching description:', error);
+		console.error('Error fetching list:', error);
 		return { status: 500, message: 'Database query error' } as DBError;
 	}
 }
@@ -529,7 +533,7 @@ export async function getValues(
 			driver: sqlite3.Database,
 		});
 
-		const result = await db.all<string[]>(
+		const result = await db.all<{ [key: string]: string }[]>(
 			`SELECT DISTINCT ${col} FROM ${table}`
 		);
 
@@ -543,6 +547,30 @@ export async function getValues(
 		await db.close();
 
 		return rows;
+	} catch (error) {
+		console.error('Error fetching values:', error);
+		return { status: 500, message: 'Database query error' } as DBError;
+	}
+}
+
+export async function getTotalPages(limit: number) {
+	try {
+		const db = await open({
+			filename: 'data/universities.sqlite',
+			driver: sqlite3.Database,
+		});
+
+		const result = await db.get<{ 'COUNT(*)': number }>(
+			`SELECT COUNT(*) from core`
+		);
+
+		await db.close();
+
+		if (!result) {
+			return { status: 500, message: 'Database query error' } as DBError;
+		}
+
+		return Math.ceil((result['COUNT(*)'] ?? 0) / limit);
 	} catch (error) {
 		console.error('Error fetching description:', error);
 		return { status: 500, message: 'Database query error' } as DBError;
