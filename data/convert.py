@@ -303,9 +303,9 @@ def fill_rankings_table(SQLITE_PATH):
     columns_to_add = {
         "SCORE": "REAL",
         "OVERALL": "INTEGER",
-        "ST_RNK": "INTEGER",
-        "INST_RNK": "INTEGER",
-        "ST_INST_RNK": "INTEGER",
+        "state": "INTEGER",
+        "control": "INTEGER",
+        "state_control": "INTEGER",
     }
 
     for col_name, col_type in columns_to_add.items():
