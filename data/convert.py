@@ -268,13 +268,14 @@ def create_list_view(SQLITE_PATH):
             core.STATE,
             core.YEAR,
             core.INST_CONTROL,
-            core.SCORE,
+            rankings.SCORE,
             enrollment.FTE_POP,
             admissions.ACC_RATE
         FROM
             core
         JOIN enrollment ON core.ID = enrollment.ID
-        JOIN admissions ON core.ID = admissions.ID;
+        JOIN admissions ON core.ID = admissions.ID
+        JOIN rankings ON core.ID = rankings.ID;
         """
     )
     conn.commit()
@@ -295,14 +296,30 @@ def create_descriptions_table(SQLITE_PATH):
     conn.close()
 
 
-def add_score_column(SQLITE_PATH):
+def fill_rankings_table(SQLITE_PATH):
     conn = sqlite3.connect(SQLITE_PATH)
     cursor = conn.cursor()
+
+    columns_to_add = {
+        "SCORE": "REAL",
+        "OVERALL": "INTEGER",
+        "ST_RNK": "INTEGER",
+        "INST_RNK": "INTEGER",
+        "ST_INST_RNK": "INTEGER",
+    }
+
+    for col_name, col_type in columns_to_add.items():
+        cursor.execute(f"ALTER TABLE rankings ADD COLUMN {col_name} {col_type}")
+        print(f"Added column {col_name} to rankings table")
+
+    conn.commit()
 
     cursor.execute(
         """
         SELECT 
             core.ID, 
+            core.STATE,
+            core.INST_CONTROL,
             core.ENDOW_FTE, 
             enrollment.FTE_POP, 
             enrollment.FT_POP, 
@@ -329,6 +346,8 @@ def add_score_column(SQLITE_PATH):
         rows,
         columns=[
             "ID",
+            "STATE",
+            "INST_CONTROL",
             "ENDOW_FTE",
             "FTE_POP",
             "FT_POP",
@@ -346,20 +365,57 @@ def add_score_column(SQLITE_PATH):
         ],
     )
     df = df.fillna(0)
-    df.insert(0, "SCORE", 0)
+
+    df["INST_CONTROL_GROUP"] = df["INST_CONTROL"].apply(
+        lambda x: 1 if x == 1 else (2 if x in [2, 3, 4] else x)
+    )
 
     df["SCORE"] = df.apply(lambda r: scoring_components(r, df), axis=1)
     df["SCORE"] = df["SCORE"].apply(lambda c: sum(c.values()))
 
-    cursor.execute("ALTER TABLE core ADD COLUMN SCORE REAL")
+    df["OVERALL"] = df["SCORE"].rank(ascending=False, method="min").astype(int)
+
+    df["ST_RNK"] = (
+        df.groupby("STATE")["SCORE"].rank(ascending=False, method="min").astype(int)
+    )
+
+    df["INST_RNK"] = (
+        df.groupby("INST_CONTROL_GROUP")["SCORE"]
+        .rank(ascending=False, method="min")
+        .astype(int)
+    )
+
+    df["ST_INST_RNK"] = (
+        df.groupby(["STATE", "INST_CONTROL_GROUP"])["SCORE"]
+        .rank(ascending=False, method="min")
+        .astype(int)
+    )
+
     for _, row in df.iterrows():
         cursor.execute(
-            "UPDATE core SET SCORE = ? WHERE ID = ?", (row["SCORE"], row["ID"])
+            """
+            UPDATE rankings
+            SET score = ?, overall = ?, state = ?, control = ?, state_control = ?
+            WHERE id = ?
+            """,
+            (
+                row["SCORE"],
+                row["OVERALL"],
+                row["ST_RNK"],
+                row["INST_RNK"],
+                row["ST_INST_RNK"],
+                row["ID"],
+            ),
         )
+
     conn.commit()
     conn.close()
 
-    print(df.head(15))
+    print(
+        df.nlargest(15, "SCORE")[
+            ["ID", "SCORE", "OVERALL", "ST_RNK", "INST_RNK", "ST_INST_RNK"]
+        ]
+    )
 
 
 def get_source_table_for_col(column_name, schema):
@@ -500,7 +556,7 @@ def main():
     create_descriptions_table(SQL_OUTPUT_PATH)
 
     print("\nScoring colleges...")
-    add_score_column(SQL_OUTPUT_PATH)
+    fill_rankings_table(SQL_OUTPUT_PATH)
 
     if os.path.exists(DESCRIPTIONS_CSV_PATH):
         descriptions_df = pd.read_csv(DESCRIPTIONS_CSV_PATH, dtype={"UNITID": str})

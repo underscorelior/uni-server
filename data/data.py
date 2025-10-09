@@ -280,7 +280,6 @@ schema = {
         "DIV_DIV": "ncaa_div",
         "RND_SPEND": "rnd_spend",
         "ENDOW_FTE": "endow_fte",
-        "SCORE": "score",
         "QS_CPF": "qs_cpf",
     },
     "admissions": {
@@ -423,6 +422,14 @@ schema = {
         "STUSRV3": "employment_services",
         "STUSRV4": "placement_services",
         "STUSRV9": "no_student_services",
+    },
+    "rankings": {
+        "UNITID": "id",
+        "SCORE": "score",
+        "OVERALL": "overall",
+        "ST_RNK": "state",
+        "INST_RNK": "control",
+        "ST_INST_RNK": "state_control",
     },
     # "sports": {
     #     "UNITID": "ID",

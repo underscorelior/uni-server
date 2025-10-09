@@ -8,6 +8,7 @@ interface UniversityInfo {
 	outcomes: Outcomes;
 	services: Services;
 	// sports: Sports;
+	rankings: Ranking;
 }
 
 type CoreInfo = {
@@ -39,7 +40,6 @@ type CoreInfo = {
 	ncaa_div: number | null;
 	rnd_spend: number | null;
 	endow_fte: number | null;
-	score: number;
 };
 
 type Admissions = {
@@ -215,6 +215,14 @@ type Services = {
 // 	track_conf: string | null;
 // 	track_conf_id: number | null;
 // };
+
+type Ranking = {
+	overall: number | null;
+	state: number | null;
+	control: number | null;
+	state_control: number | null;
+	score: number | null;
+};
 
 type DBError = {
 	message: string;

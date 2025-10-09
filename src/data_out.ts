@@ -235,6 +235,22 @@ export async function services(id: number): Promise<Services | DBError> {
 	return output as Services;
 }
 
+export async function rankings(id: number): Promise<Ranking | DBError> {
+	const result = await query<Ranking>('rankings', id);
+	if ('status' in result) {
+		return result;
+	}
+
+	const output = Object.fromEntries(
+		Object.entries(result).map(([col, val]) => {
+			const key = col.toLowerCase();
+			return [key, val];
+		})
+	);
+
+	return output as Ranking;
+}
+
 export const validTypes = [
 	'core',
 	'description',
@@ -244,6 +260,7 @@ export const validTypes = [
 	'outcomes',
 	'services',
 	// 'sports'
+	'rankings',
 ];
 
 export async function getData(
@@ -321,6 +338,13 @@ export async function getData(
 			// 	output.sports = sportsResult;
 			// 	break;
 			// }
+			case 'rankings': {
+				const rankingsResult = await rankings(id);
+				if ('status' in rankingsResult)
+					return rankingsResult as DBError;
+				output.rankings = rankingsResult;
+				break;
+			}
 			default:
 				return {
 					status: 400,
@@ -476,9 +500,12 @@ export async function description(id: number): Promise<string | DBError> {
 
 export async function list(
 	filter: string,
-	offset: number,
+	page: number,
 	limit: number
-): Promise<CollegeList[] | DBError> {
+): Promise<{ count: number; list: CollegeList[] } | DBError> {
+	console.log(
+		`Listing with filter: ${filter}, page: ${page}, limit: ${limit}`
+	);
 	// query format: "x=y" ex. "state=CA:size>5000"
 	try {
 		let rows: CollegeList[] = [];
@@ -508,14 +535,17 @@ export async function list(
 				filter ? `WHERE ${where.join(' AND ')}` : ''
 			} ORDER BY score DESC LIMIT ? OFFSET ?`,
 			limit,
-			offset
+			page * limit
 		);
 
 		rows = result ?? [];
 
 		await db.close();
 
-		return rows;
+		const count = await getTotalPages(where);
+		if (typeof count !== 'number') return count as DBError;
+
+		return { count, list: rows };
 	} catch (error) {
 		console.error('Error fetching list:', error);
 		return { status: 500, message: 'Database query error' } as DBError;
@@ -553,7 +583,9 @@ export async function getValues(
 	}
 }
 
-export async function getTotalPages(limit: number) {
+export async function getTotalPages(
+	filter: string[]
+): Promise<number | DBError> {
 	try {
 		const db = await open({
 			filename: 'data/universities.sqlite',
@@ -561,7 +593,9 @@ export async function getTotalPages(limit: number) {
 		});
 
 		const result = await db.get<{ 'COUNT(*)': number }>(
-			`SELECT COUNT(*) from core`
+			`SELECT COUNT(*) from core ${
+				filter ? `WHERE ${filter.join(' AND ')}` : ''
+			}`
 		);
 
 		await db.close();
@@ -570,7 +604,8 @@ export async function getTotalPages(limit: number) {
 			return { status: 500, message: 'Database query error' } as DBError;
 		}
 
-		return Math.ceil((result['COUNT(*)'] ?? 0) / limit);
+		// return Math.ceil((result['COUNT(*)'] ?? 0) / limit);
+		return result['COUNT(*)'] ?? 0;
 	} catch (error) {
 		console.error('Error fetching description:', error);
 		return { status: 500, message: 'Database query error' } as DBError;
