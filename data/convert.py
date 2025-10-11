@@ -146,6 +146,36 @@ def apply_special_cases(df, div_path, found_csv, rnd_path, cpf_path, column_rena
             axis=1,
         )
 
+    if "OUT_TOTAL" in column_rename_map or "IN_TOTAL" in column_rename_map:
+        df["OUT_TOTAL"] = df.apply(
+            lambda row: sum(
+                row.get(col, 0)
+                for col in [
+                    "CHG3AT3",
+                    "CHG3AF3",
+                    "CHG4AY3",
+                    "CHG5AY3",
+                    "CHG6AY3",
+                ]
+                if pd.notnull(row.get(col))
+            ),
+            axis=1,
+        )
+        df["IN_TOTAL"] = df.apply(
+            lambda row: sum(
+                row.get(col, 0)
+                for col in [
+                    "CHG2AT3",
+                    "CHG2AF3",
+                    "CHG4AY3",
+                    "CHG5AY3",
+                    "CHG6AY3",
+                ]
+                if pd.notnull(row.get(col))
+            ),
+            axis=1,
+        )
+
     if "ENDOW_FTE" in column_rename_map:
         if all(
             col in df.columns
@@ -407,10 +437,8 @@ def fill_rankings_table(SQLITE_PATH):
                 row["ID"],
             ),
         )
-
     conn.commit()
     conn.close()
-
     print(
         df.nlargest(15, "SCORE")[
             ["ID", "SCORE", "OVERALL", "ST_RNK", "INST_RNK", "ST_INST_RNK"]
