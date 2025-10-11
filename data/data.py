@@ -381,12 +381,12 @@ schema = {
         "CHG2AT3": "in_tuition",
         "CHG2AF3": "in_fees",
         # "CHG2AY3": "in_total_cost",
-        "IN_TOTAL": "in_total_cost",  # In tuition + In fees + supp cost + on dorm mls cost + on other cost
+        "IN_TOTAL": "in_total",  # In tuition + In fees + supp cost + on dorm mls cost + on other cost
         "SCFA13P": "out_pct",
         "CHG3AT3": "out_tuition",
         "CHG3AF3": "out_fees",
         # "CHG3AY3": "out_total_cost",
-        "OUT_TOTAL": "out_total_cost",
+        "OUT_TOTAL": "out_total",
         "CHG4AY3": "supp_cost",
         "CHG5AY3": "on_dorm_mls_cost",
         "CHG6AY3": "on_other_cost",
