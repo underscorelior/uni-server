@@ -369,6 +369,7 @@ schema = {
     "costs": {
         "UNITID": "id",
         "NPRICURL": "net_calc_url",
+        "FAIDURL": "faid_url",
         "TUITVARY": "tuit_vary",
         "ROOM": "offers_housing",
         "ROOMCAP": "housing_capacity",
@@ -414,7 +415,6 @@ schema = {
     },
     "services": {
         "UNITID": "id",
-        "FAIDURL": "faid_url",
         "SLO5": "rotc",
         "SLO6": "study_abroad",
         "SLO8": "teacher_cert",

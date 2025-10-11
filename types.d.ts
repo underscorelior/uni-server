@@ -143,6 +143,7 @@ type EnrollmentInfo = {
 
 type Costs = {
 	net_calc_url: string;
+	faid_url: string | null;
 	tuit_vary: boolean | null;
 	offers_housing: boolean | null;
 	housing_capacity: number | null;
@@ -185,7 +186,6 @@ type Outcomes = {
 };
 
 type Services = {
-	faid_url: string | null;
 	rotc: boolean | null;
 	study_abroad: boolean | null;
 	teacher_cert: boolean | null;
