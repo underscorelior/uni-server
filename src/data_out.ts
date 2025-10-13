@@ -56,7 +56,7 @@ export async function core(id: number): Promise<CoreInfo | DBError> {
 			const value = conv
 				? (conv as any)[String(val)]
 				: typeof val === 'string'
-				? val.trim()
+				? (val as string).trim()
 				: val;
 
 			return [key, value];
@@ -225,7 +225,7 @@ export async function services(id: number): Promise<Services | DBError> {
 			const value = conv
 				? (conv as any)[String(val)]
 				: typeof val === 'string'
-				? val.trim()
+				? (val as string).trim()
 				: val;
 
 			return [key, value];
@@ -516,24 +516,27 @@ export async function list(
 
 		const where = [] as string[];
 
-		filter.split(':').forEach((f) => {
-			let out = '';
-			if (!(f.length >= 2)) return;
+		if (filter !== '') {
+			filter.split(':').forEach((f) => {
+				let out = '';
+				if (!(f.length >= 2)) return;
 
-			if (f.includes('=')) {
-				out = ` ${f.split('=')[0].trim()}${
-					f.split('=')[1].includes(',') ? ' IN (' : "= '"
-				}${f.split('=')[1].trim()}${
-					f.split('=')[1].includes(',') ? ')' : "'"
-				}`;
-			}
-			where.push(out);
-		}); // TODO: Improve this to not be so messy
+				if (f.includes('=')) {
+					out = ` ${f.split('=')[0].trim()}${
+						f.split('=')[1].includes(',') ? ' IN (' : "= '"
+					}${f.split('=')[1].trim()}${
+						f.split('=')[1].includes(',') ? ')' : "'"
+					}`;
+					where.push(out);
+				}
+			}); // TODO: Improve this to not be so messy
+		}
+		console.log(where);
+
+		const clauses = where.length > 0 ? `WHERE ${where.join(' AND ')}` : '';
 
 		const result = await db.all<CollegeList[]>(
-			`SELECT * FROM list ${
-				filter ? `WHERE ${where.join(' AND ')}` : ''
-			} ORDER BY score DESC LIMIT ? OFFSET ?`,
+			`SELECT * FROM list ${clauses} ORDER BY score DESC LIMIT ? OFFSET ?`,
 			limit,
 			page * limit
 		);
@@ -542,7 +545,7 @@ export async function list(
 
 		await db.close();
 
-		const count = await getTotalPages(where);
+		const count = await getTotalPages(clauses);
 		if (typeof count !== 'number') return count as DBError;
 
 		return { count, list: rows };
@@ -584,7 +587,7 @@ export async function getValues(
 }
 
 export async function getTotalPages(
-	filter: string[]
+	clauses: string | null
 ): Promise<number | DBError> {
 	try {
 		const db = await open({
@@ -593,9 +596,7 @@ export async function getTotalPages(
 		});
 
 		const result = await db.get<{ 'COUNT(*)': number }>(
-			`SELECT COUNT(*) from core ${
-				filter ? `WHERE ${filter.join(' AND ')}` : ''
-			}`
+			`SELECT COUNT(*) from core ${clauses ? clauses : ''}`
 		);
 
 		await db.close();
@@ -607,7 +608,7 @@ export async function getTotalPages(
 		// return Math.ceil((result['COUNT(*)'] ?? 0) / limit);
 		return result['COUNT(*)'] ?? 0;
 	} catch (error) {
-		console.error('Error fetching description:', error);
+		console.error('Error fetching total count:', error);
 		return { status: 500, message: 'Database query error' } as DBError;
 	}
 }

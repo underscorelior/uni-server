@@ -1,3 +1,5 @@
+import sqlite3 from 'sqlite3';
+
 function tokenize(s: string) {
 	return s
 		.toLowerCase()
@@ -80,4 +82,18 @@ export async function searchRanking(
 		state: r.state,
 		online: r.online,
 	}));
+}
+
+export function logVisit({
+	db_path,
+	route,
+	id,
+}: {
+	db_path: string;
+	route: string;
+	id: number;
+}) {
+	const db = new sqlite3.Database(db_path);
+	db.run('INSERT INTO visits (unit_id, route) VALUES (?, ?)', [id, route]);
+	db.close();
 }

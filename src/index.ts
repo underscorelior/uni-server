@@ -1,16 +1,31 @@
 import express, { Request, Response } from 'express';
-import {
-	deleteAllDescriptions,
-	deleteDescription,
-	description,
-	getData,
-	getValues,
-	list,
-	search,
-} from './data_out';
+import { getData, getValues, list, search } from './data_out';
+
+import sqlite3 from 'sqlite3';
+
+import * as fs from 'fs';
+import * as path from 'path';
+import { logVisit } from './utils';
+
+const LOGGING_DIR = './logs';
+const LOGGING_FILENAME = 'logging.sqlite';
 
 const app = express();
 
+app.use((req, _res, next) => {
+	try {
+		logVisit({
+			db_path: path.join(LOGGING_DIR, LOGGING_FILENAME),
+			route: req.path.replace('/api/', ''),
+			id: Number(req.query.id) || -1,
+		});
+	} catch (e) {
+		console.error('Logging error:', e);
+	}
+	next();
+});
+
+// TODO: Find a way to reliably obtain images of campuses, etc.
 app.get('/api/search', async (req: Request, res: Response): Promise<void> => {
 	const result = await search(req.query.search as string);
 	if ('status' in result) {
@@ -23,7 +38,7 @@ app.get('/api/search', async (req: Request, res: Response): Promise<void> => {
 app.get('/api/list', async (req: Request, res: Response): Promise<void> => {
 	const result = await list(
 		(req.query.filter as string) || '',
-		(req.query.offset as unknown as number) || 0,
+		(req.query.page as unknown as number) || 0,
 		(req.query.limit as unknown as number) || 50
 	);
 
@@ -31,6 +46,7 @@ app.get('/api/list', async (req: Request, res: Response): Promise<void> => {
 		res.status(result.status).json({ message: result.message });
 		return;
 	}
+
 	res.json(result);
 });
 
@@ -129,5 +145,47 @@ app.get('/api/get', async (req: Request, res: Response): Promise<void> => {
 
 const PORT = process.env.PORT || 1234;
 app.listen(PORT, () => {
+	console.log(`Creating ${LOGGING_FILENAME} if it doesn't exist.`);
+
+	fs.mkdir(LOGGING_DIR, () => {});
+
+	const db = new sqlite3.Database(
+		path.join(LOGGING_DIR, LOGGING_FILENAME),
+		(err) => {
+			if (err) {
+				console.error('Error connecting to database:', err.message);
+			} else {
+				console.log('Connected to the logging database.');
+			}
+		}
+	);
+
+	db.serialize(() => {
+		db.run(
+			`CREATE TABLE IF NOT EXISTS visits (
+			unit_id INTEGER,
+			route TEXT,
+			timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+		)`,
+
+			(err) => {
+				if (err) {
+					console.error('Error creating visits table:', err.message);
+				}
+			}
+		);
+	});
+	setTimeout(() => {
+		db.close((err) => {
+			if (err) {
+				console.error(
+					'Error closing the database connection:',
+					err.message
+				);
+			}
+		});
+	}, 1000);
 	console.log(`Server running on port ${PORT}`);
 });
+
+// TODO: Add ability to compare with national stats
