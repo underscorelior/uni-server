@@ -294,8 +294,8 @@ export async function getData(
 					typeof descriptionResult !== 'string' &&
 					'status' in descriptionResult
 				)
-					return descriptionResult as DBError;
-				output.description = descriptionResult;
+					output.description = undefined;
+				else output.description = descriptionResult;
 				break;
 			}
 			case 'admissions': {
